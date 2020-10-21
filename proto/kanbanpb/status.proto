@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package kanbanpb;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
+
+service Kanban {
+    // 最新のCカンバンを取得する
+    rpc MicroserviceConn(stream Request) returns (stream Response);
+}
+
+service SendAnything {
+    rpc ServiceBrokerConn(stream SendKanban) returns (stream SendKanban);
+    rpc SendToOtherDevices(stream SendContext) returns (UploadStatus);
+}
+
+// Cカンバンデータ
+message StatusKanban {
+    string startAt = 1;
+    string finishAt = 2;
+    repeated ServiceData services = 3;
+    string connectionKey = 4;
+    int32 processNumber = 5;
+    bool priorSuccess = 6;
+    string dataPath = 7;
+    repeated string fileList = 8;
+    google.protobuf.Struct metadata = 9;
+}
+
+message ServiceData {
+    string name = 1;
+    string device = 2;
+}
+
+// --------------------- Send Anything Server --------------------------
+
+message SendKanban {
+    string deviceName = 1;
+    string deviceAddr = 2;
+    string nextService = 3;
+    int32 nextNumber = 4;
+    StatusKanban afterKanban = 5;
+}
+
+message Chunk {
+    bytes context = 1;
+    string name = 2;
+}
+
+enum UploadRequestCode {
+    SendingKanban = 0;
+    SendingFile_CONT = 1;
+    SendingFile_EOF = 2;
+    EOS = 3;
+}
+
+message SendContext {
+    UploadRequestCode code = 1;
+    google.protobuf.Any context = 2;
+}
+
+enum UploadStatusCode {
+    Unknown = 0;
+    Failed = 1;
+    OK = 2;
+}
+
+message UploadStatus {
+    string Message = 1;
+    UploadStatusCode statusCode = 2;
+}
+
+// --------------------- Status Kanban Server ---------------------------
+// サービス起動時通知
+message InitializeService {
+    string microserviceName = 1;
+    int32 processNumber = 2;
+}
+
+// サービス起動時通知（マイクロサービからカンバン取得[for debug] )
+message InitializeServiceWithKanban{
+    string microserviceName = 1;
+    StatusKanban cacheKanban = 2;
+}
+
+// microserviceの実行結果
+message OutputRequest {
+    bool priorSuccess = 1;
+    string dataPath = 2;
+    string connectionKey = 3;
+    int32 processNumber = 4;
+    repeated string fileList = 5;
+    google.protobuf.Struct metadata = 6;
+    string deviceName = 7;
+}
+
+enum RequestType {
+    START_SERVICE = 0;
+    START_SERVICE_WITHOUT_KANBAN = 1;
+    OUTPUT_AFTER_KANBAN = 2;
+}
+
+enum ResponseType {
+    RES_CACHE_KANBAN = 0;
+    RES_REQUEST_RESULT = 1;
+}
+
+message Request {
+    RequestType messageType = 1;
+    google.protobuf.Any message = 2;
+}
+
+message Response {
+    ResponseType messageType = 1;
+    google.protobuf.Any message = 2;
+    string error = 3;
+}

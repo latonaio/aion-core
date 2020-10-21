@@ -1,0 +1,13 @@
+{
+    "startAt": "",
+    "finishAt": "",
+    "services": [
+        "test"
+    ],
+    "connectionKey": "key",
+    "processNumber": 1,
+    "priorSuccess": true,
+    "dataPath": "",
+    "metadata": {
+        }
+}

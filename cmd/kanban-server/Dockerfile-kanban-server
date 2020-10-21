@@ -1,0 +1,33 @@
+# syntax = docker/dockerfile:experimental
+# Build Container
+FROM golang:1.13.5 as kanban-server-builder
+
+ENV GO111MODULE on
+WORKDIR /go/src/bitbucket.org/latonaio
+
+COPY go.mod .
+
+RUN go mod download
+
+COPY . .
+
+RUN go build -o kanban-server ./cmd/kanban-server
+
+
+# Runtime Container
+FROM alpine:3.12
+
+RUN apk add --no-cache libc6-compat
+
+ENV SERVICE=status-kanban-server \
+    POSITION=BackendService \
+    AION_HOME="/var/lib/aion" \
+    APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+
+RUN mkdir -p ${AION_HOME}/Data && \
+    mkdir -p ${APP_DIR}
+WORKDIR ${APP_DIR}
+
+COPY --from=kanban-server-builder /go/src/bitbucket.org/latonaio/kanban-server .
+
+CMD ["./kanban-server"]

@@ -1,0 +1,27 @@
+microservices:
+  sample-microservice-job:
+    command: ["/bin/sh", "docker-entrypoint.sh"]
+    tag: v1.0.0
+    scale: 1
+    startup: yes
+    always: no
+    env:
+      KANBAN_MODE: send_kanbans_at_highspeed
+      SERVICE: sample-microservice-job
+      SLEEP_TIME: "1"
+      LOOP_COUNT: "10"
+    volumeMountPathList:
+      - /media:/media:Bidirectional
+    privileged: yes
+    nextService:
+      default:
+        - name: sample-microservice-deployment
+  sample-microservice-deployment:
+    command: ["python3", "-m", "aionsample"]
+    scale: 1
+    startup: no
+    always: yes
+    env:
+      KANBAN_MODE: main_with_kanban_itr
+      SERVICE: sample-microservice-deployment
+    serviceAccount: controller-serviceaccount

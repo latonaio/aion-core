@@ -1,0 +1,33 @@
+# syntax = docker/dockerfile:experimental
+# Build Container
+FROM golang:1.13.5 as send-anything-builder
+
+ENV GO111MODULE on
+WORKDIR /go/src/bitbucket.org/latonaio
+
+COPY go.mod .
+
+RUN go mod download
+
+COPY . .
+
+RUN go build -o send-anything ./cmd/send-anything
+
+
+# Runtime Container
+FROM alpine:3.12
+
+RUN apk add --no-cache libc6-compat
+
+ENV SERVICE=send-anything-server \
+    POSITION=BackendService \
+    AION_HOME="/var/lib/aion" \
+    APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+
+RUN mkdir -p ${AION_HOME}/Data && \
+    mkdir -p ${APP_DIR}
+WORKDIR ${APP_DIR}
+
+COPY --from=send-anything-builder /go/src/bitbucket.org/latonaio/send-anything .
+
+CMD ["./send-anything"]
