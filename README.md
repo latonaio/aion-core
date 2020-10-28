@@ -21,8 +21,13 @@
     - [AIONの起動、停止](#AIONの起動、停止)
 
 ## 概要
-aion-coreはAIONTMのプラットフォームにあるマイクロサービスを動作させるのに必要なオープンソースシステムです。
-AIONTMのメインコンポーネント、マイクロサービスで利用するライブラリ、kubernetesのデプロイメントに必要なConfigなどを提供しております。
+aion-coreはAIONのプラットフォームにあるマイクロサービスを動作させるのに必要なオープンソースシステムです。
+AIONのメインコンポーネント、マイクロサービスで利用するライブラリ、kubernetesのデプロイメントに必要なConfigなどを提供しております。
+
+## マイクロサービス構成図の例
+<a target="_blank" href="https://github.com/latonaio/aion-core/blob/main/documents/aion-core-architecture.png">
+<img src="https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png" width="300">
+</a>
 
 ## 動作環境
 ### 1.前提条件
