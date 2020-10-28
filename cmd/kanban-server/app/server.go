@@ -12,8 +12,10 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"net"
 	"strconv"
+	"time"
 )
 
 type Server struct {
@@ -33,7 +35,13 @@ func NewServer(env *Env) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
-	grpcServer := grpc.NewServer()
+
+	kaep := keepalive.EnforcementPolicy{
+		MinTime:             15 * time.Second,
+		PermitWithoutStream: true,
+	}
+
+	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep))
 	kanbanpb.RegisterKanbanServer(grpcServer, server)
 	log.Printf("Start Status kanban server:%d", env.GetServerPort())
 

@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/protobuf/encoding/protojson"
 	"strings"
 	"time"
@@ -131,8 +132,14 @@ func NewKanbanClient(ctx context.Context) (MicroserviceClient, error) {
 		env.MsNumber = 1
 	}
 
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second,
+		Timeout:             10 * time.Second,
+		PermitWithoutStream: true,
+	}
+
 	// connect to send anything server
-	conn, err := grpc.DialContext(ctx, env.KanbanAddr, grpc.WithInsecure())
+	conn, err := grpc.DialContext(ctx, env.KanbanAddr, grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
 
 	if err != nil {
 		conn.Close()
