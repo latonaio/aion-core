@@ -24,7 +24,7 @@
 aion-coreはAIONのプラットフォームにあるマイクロサービスを動作させるのに必要なオープンソースシステムです。
 AIONのメインコンポーネント、マイクロサービスで利用するライブラリ、kubernetesのデプロイメントに必要なConfigなどを提供しております。
 
-## マイクロサービス構成図の例
+## マイクロサービス構成の例
 <a target="_blank" href="https://github.com/latonaio/aion-core/blob/main/documents/aion-core-architecture.png">
 <img src="https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png" width="300">
 </a>
@@ -41,8 +41,6 @@ AIONのメインコンポーネント、マイクロサービスで利用する�
 * envoyのインストール
 * project-yamlsのインストール
 * aion-core-manifestsのインストール
-
-https://github.com/microsoftgraph/ruby-connect-rest-sample/blob/master/README-Localized/README-ja-jp.md#%E5%89%8D%E6%8F%90%E6%9D%A1%E4%BB%B6
 
 ```
 AIONではLinuxの端末名を頼りに端末間通信を行う
