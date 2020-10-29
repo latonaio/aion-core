@@ -1,59 +1,70 @@
-# AION-CoreのREADME作成
-
-**目次**
-- [概要](#概要)
-- [動作環境](#動作環境)
-    - [前提条件](#1.前提条件)
-    - [事前準備](#2.事前準備)
-- [インストール](#インストール)
-    - [ディレクトリを作成](#ディレクトリを作成)
-    - [Golang](#Golang)
-    - [kubernetes](#kubernetes)
-        - [MasterNode](#MasterNode)
-            - [1.JetsonのSwap機能をOFFにする](#1.JetsonのSwap機能をOFFにする)
-            - [2.Dockerをインストール&有効化する](#2.Dockerをインストール&有効化する)
-            - [3.kubeadm、kubelet、kubectlをインストールする](#3.kubeadm、kubelet、kubectlをインストールする)
-            - [4.Kubeadmでセットアップを行う](#4.Kubeadmでセットアップを行う)
-            - [5.Flannelのコンテナをデプロイする](#5.Flannelのコンテナをデプロイする)
-    - [aion-core](#aion-core)
-    - [envoy](#envoy)
-    - [project.ymlの配置](#project.ymlの配置)
-    - [AIONの起動、停止](#AIONの起動、停止)
-
-## 概要
+## aion-core
 aion-coreはAIONのプラットフォームにあるマイクロサービスを動作させるのに必要なオープンソースシステムです。
 AIONのメインコンポーネント、マイクロサービスで利用するライブラリ、kubernetesのデプロイメントに必要なConfigなどを提供しております。
 
+**目次**
+- [マイクロサービス構成の例](#マイクロサービス構成の例)
+- [動作環境](#動作環境)
+    - [前提条件](#前提条件)
+- [事前準備](#事前準備)
+- [hostnameの設定](#hostnameの設定)
+- [セットアップ](#セットアップ)
+    - [ディレクトリ](#ディレクトリ)
+    - [kubernetes](#kubernetes)
+        - [1.Dockerをインストール&有効化](#1.Dockerをインストール&有効化)
+        - [2.kubeadm、kubelet、kubectlをインストール](#2.kubeadm、kubelet、kubectlをインストール)
+        - [3.Kubeadmでセットアップ](#3.Kubeadmでセットアップ)
+        - [4.Flannelのコンテナをデプロイする](#4.Flannelのコンテナをデプロイする)
+        - [5.Master Nodeの隔離を無効にする](#5.Master Nodeの隔離を無効にする)
+        - [6.Master Nodeがクラスターに参加していることを確認する](#6.Master Nodeがクラスターに参加していることを確認する)
+    - [aion-core](#aion-core)
+    - [envoy](#envoy)
+    - [project.yml](#project.yml)
+        - [配置](#配置)        
+        - [項目定義](#項目定義)  
+- [AIONの起動と停止](#AIONの起動と停止)
+    - [aion-core-manifests](#aion-core-manifests)
+    - [default](#default)
+        - [起動](#起動)
+        - [停止](#停止)
+            - [aion-coreのみを停止](#aion-coreのみを停止)
+            - [aionを停止](#aionを停止)
+    - [prjネームスペース](#prjネームスペース)
+        - [起動](#起動)
+            - [aion-coreのみを停止](#aion-coreのみを停止)
+            - [aionを停止](#aionを停止)
+- [AIONの起動確認](#AIONの起動確認)
+            
 ## マイクロサービス構成の例
 <a target="_blank" href="https://github.com/latonaio/aion-core/blob/main/documents/aion-core-architecture.png">
 <img src="https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png" width="300">
 </a>
 
 ## 動作環境
-### 1.前提条件
+### 前提条件
 動作には以下の環境であることを前提とします。
 * Ubuntu OS
 * ARM CPU搭載のデバイス
 
-### 2.事前準備
-実行環境に以下のソフトウェアがインストールされている事を前提とします。
-* kubernetesのインストール
-* envoyのインストール
-* project-yamlsのインストール
-* aion-core-manifestsのインストール
+## 事前準備
+* ネットワークIPアドレスの固定
+* hostnameの設定
 
+### hostnameの設定
+AIONではLinuxの端末名を頼りに端末間通信を行うので
+端末名を一台ごとに異なるものに変えておく必要があります。
+端末名を変更する場合は以下のコマンドを実行。
 ```
-AIONではLinuxの端末名を頼りに端末間通信を行う
-端末名を一台ごとに異なるものに変えておく必要がある
-端末名を変更する場合は以下のコマンドを実行
 hostnamectl set-hostname [new device name]
-その後一度ターミナルを閉じ、開き直す
-以下のコマンドを実行し、変更できていることを確認する
+```
+その後一度ターミナルを閉じ、開き直し、
+以下のコマンドを実行したら変更できていることを確認します。
+```
 hostnamectl
 ```
 
-## インストール
-### ディレクトリを作成
+## セットアップ
+### ディレクトリ
 ```
 mkdir ~/$(hostname)
 mkdir ~/$(hostname)/AionCore
@@ -70,22 +81,23 @@ sudo mkdir -p /var/lib/aion/Data/deployment
 sudo mkdir -p /var/lib/aion/prj/Data
 ```
 
-##### 2.Dockerをインストール&有効化する
+### kubernetes
+#### 1.Dockerをインストール&有効化
 ```
 sudo apt install docker.io
 sudo systemctl start docker
 sudo systemctl enable docker
 ```
 
+ログインユーザにDockerコマンドの実行権限を付与する必要があります。
+権限を付与するには以下のコマンドを実行する。
 ```
-ログインユーザにDockerコマンドの実行権限を付与する必要がある
-権限を付与するには以下のコマンドを実行する
 sudo gpasswd -a $USER docker
 sudo systemctl restart docker
 ```
 
-##### 3.kubeadm、kubelet、kubectlをインストールする
-今回は、Kubernentsクラスターを構築するツールであるKubeadmを用いてセットアップを行う。
+#### 2.kubeadm、kubelet、kubectlをインストール
+Kubernentsクラスターを構築するツールであるKubeadmを用いてセットアップを行います。
 ```
 sudo apt update && sudo apt install -y apt-transport-https curl
 curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
@@ -96,8 +108,8 @@ sudo apt update && sudo apt install -y kubelet kubeadm kubectl
 sudo apt show kubelet kubeadm kubectl
 ```
 
-##### 4.Kubeadmでセットアップを行う
-ここでKubernentsのMaster Nodeのセットアップを行うが、ここでホスト側のIPアドレスがKubernentesの設定ファイルに書き込まれるため、静的IPアドレスを設定しておくことをおすすめします。
+#### 3.Kubeadmでセットアップ
+KubernentsのMaster Nodeのセットアップを行いますが、ホスト側のIPアドレスがKubernentesの設定ファイルに書き込まれるため、静的IPアドレスを設定しておくことをおすすめします。
 ```
 sudo kubeadm init --pod-network-cidr=10.244.10.0/16
 mkdir $HOME/.kube/
@@ -107,21 +119,21 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 ※「apiserver-cert-extra-sans」オプションは外部サーバからkubectlで接続したい場合、接続元のIPアドレスを入力する項目になります（不要であればオプションごと削除して構いません）
 
-##### 5.Flannelのコンテナをデプロイする
-ポッド間の通信を行うための、コンテナがクラスター上にデプロイされていないためCNIのネットワークアドオンをデプロイする。
+#### 4.Flannelのコンテナをデプロイする
+ポッド間の通信を行うためのコンテナがクラスター上にデプロイされていないためCNIのネットワークアドオンをデプロイする。
 ```
 kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/2140ac876ef134e0ed5af15c65e414cf26827915/Documentation/kube-flannel.yml
 ```
 
-##### 6.Master Nodeの隔離を無効にする
+#### 5.Master Nodeの隔離を無効にする
 ```
 kubectl taint nodes --all node-role.kubernetes.io/master-
 ```
 
-※デフォルトでは、マスターノードに対してSystem系以外のPodが配置されないよう設定されているため
+※ デフォルトでは、マスターノードに対してSystem系以外のPodが配置されないよう設定されているため
 
-##### 7.Master Nodeがクラスターに参加していることを確認する
-下記のコマンドを実行し、NodeのStatusがReadyになっていればセットアップが完了
+#### 6.Master Nodeがクラスターに参加していることを確認する
+下記のコマンドを実行し、NodeのStatusがReadyになっていればセットアップが完了です。
 ```
 kubectl get node
 ```
@@ -129,8 +141,12 @@ kubectl get node
 ### aion-core
 ```
 echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
+```
+
+daemon.jsonの内容を変更します。
+```
 sudo vi /etc/docker/daemon.json
-以下の内容に変更する　（※i押す前ならddで１行ずつ消せる）
+// 以下の内容に変更する
 =====
 {
     "default-runtime": "nvidia",
@@ -144,8 +160,7 @@ sudo vi /etc/docker/daemon.json
 }
 =====
 source ~/.bashrc
-reboot
-⇒Ubuntuを再起動する
+reboot // Ubuntuを再起動する
 ```
 ```
 cd $(hostname)/AionCore
@@ -164,11 +179,19 @@ make docker-build-l4t
 ### envoy
 ```
 docker login
-docker pull latonaio/envoy:latest
+docker pull envoyproxy/envoy:v1.16-latest
 docker tag latonaio/envoy:latest localhost:31112/envoy:latest
 ```
+※ v1.16以降はdockerのARCのタイプがlinux/arm64に対応している
 
-### project.ymlの配置
+### project.yml
+#### 配置
+project.ymlを配置します。
+```
+project.ymlは/var/lib/aion/(namespace)/configの中に配置する。
+```
+
+#### 項目定義
 ```
 deviceName：自身のデバイス名。ここの値をdevices配下のマイクロサービスで環境変数DEVICE_NAMEとして参照できる
 
@@ -202,36 +225,53 @@ microservices.[service-name].withoutKanban：
       MY_NODE_NAME: YOUR_DEVICE_NAME
 ```
 
-project.ymlの配置
+## AIONの起動と停止
+### aion-core-manifests
+aion-core-manifestsリポジトリをGit Cloneします。
 ```
-project.ymlは/var/lib/aion/(namespace)/configの中に配置する。
-```
-
-## AIONの起動、停止
-```
-aion-core-manifestsリポジトリをクローンする
 cd ~/$(hostname)/AionCore
 git clone https://github.com/latonaio/aion-core-manifests.git
 cd aion-core-manifests
 ```
 
+### default
+#### 起動
 ```
-用途に応じていずれかのコマンドを実行する
 defaultネームスペースでaionを起動する
 $ bash kubectl-apply.sh
+```
+
+#### 停止
+##### aion-coreのみを停止
 defaultネームスペースで起動しているaion-coreのみ停止する（サーバは停止しない）
+```
 $ bash kubectl-delete only-aion.sh
+```
+##### aionを停止
 defaultネームスペースで起動しているaionを停止する
+```
 $ bash kubectl-delete.sh
- 
+```
+
+### prjネームスペース
+#### 起動
 prjネームスペースでaionを起動する
+```
 $ kubectl apply -f generated/prj.yml
+```
+
+##### aion-coreのみを停止
 prjネームスペースで起動しているaion-coreのみ停止する（サーバは停止しない）
+```
 $ bash kubectl-delete only-aion-prj.sh
+```
+##### aionを停止
 prjネームスペースで起動しているaionを停止する（prjネームスペースごと）
+```
 $ kubectl delete -f generated/prj.yml
 ```
 
+### AIONの起動
 ```
 aion-coreが正常に動作しているか確認するには、以下のコマンドを実行する
 $ kubectl get pod
@@ -248,3 +288,4 @@ redis-cluster : Redisサーバ
 
 その後、任意のマイクロサービスが起動しているかを確認する
 ```
+
