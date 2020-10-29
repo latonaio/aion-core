@@ -47,18 +47,19 @@ AIONのメインコンポーネント、マイクロサービスで利用する�
 ### hostnameの設定
 AIONではLinuxの端末名を頼りに端末間通信を行うので
 端末名を一台ごとに異なるものに変えておく必要があります。
-端末名を変更する場合は以下のコマンドを実行。
+端末名を変更する場合は以下のコマンドを実行してください。
 ```
 hostnamectl set-hostname [new device name]
 ```
 その後一度ターミナルを閉じ、開き直し、
-以下のコマンドを実行したら変更できていることを確認します。
+以下のコマンドを実行して端末名が変更されていることを確認します。
 ```
 hostnamectl
 ```
 
 ## セットアップ
 ### ディレクトリ
+はじめに作業ファイル等を配置するディレクトリを作成します。
 ```
 mkdir ~/$(hostname)
 mkdir ~/$(hostname)/AionCore
@@ -84,7 +85,7 @@ sudo systemctl enable docker
 ```
 
 ログインユーザにDockerコマンドの実行権限を付与する必要があります。
-権限を付与するには以下のコマンドを実行する。
+権限を付与するには以下のコマンドを実行してください。
 ```
 sudo gpasswd -a $USER docker
 sudo systemctl restart docker
@@ -166,7 +167,12 @@ cd ..
 ```
 
 #### pyhon-base-imagesのセットアップ
-pyhon-base-imagesのセットアップは<a href="https://github.com/latonaio/python-base-images">こちら</a>のREADMEを参照してください。
+一部のマイクロサービスのDockerイメージには、以下のベースイメージが必要となります。
+- latonaio/l4t
+- latonaio/pylib-lite
+
+pyhon-base-imagesの<a href="https://github.com/latonaio/python-base-images">README</a>を参照し、これらのベースイメージを準備してください。
+
 
 ### envoy
 ```
@@ -174,7 +180,7 @@ docker login
 docker pull envoyproxy/envoy:v1.16-latest
 docker tag latonaio/envoy:latest localhost:31112/envoy:latest
 ```
-※ v1.16以降はdockerのARCのタイプがlinux/arm64に対応している
+※ v1.16より古いバージョンのenvoyはarm64CPU上では動作しないため、バージョン指定を間違えないよう注意してください
 
 ### project.yml
 #### 配置
