@@ -162,15 +162,10 @@ git clone https://github.com/latonaio/aion-core.git
 cd aion-core
 docker login
 make docker-build
-
-```
-
-#### pyhon-base-imagesのセットアップ
-
-```
 cd ..
 ```
 
+#### pyhon-base-imagesのセットアップ
 pyhon-base-imagesのセットアップは<a href="https://github.com/latonaio/python-base-images">こちら</a>のREADMEを参照してください。
 
 ### envoy
