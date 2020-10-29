@@ -1,4 +1,4 @@
-## aion-core
+# aion-core
 aion-coreはAIONのプラットフォームにあるマイクロサービスを動作させるのに必要なオープンソースシステムです。
 AIONのメインコンポーネント、マイクロサービスで利用するライブラリ、kubernetesのデプロイメントに必要なConfigなどを提供しております。
 
@@ -163,12 +163,15 @@ cd aion-core
 docker login
 make docker-build
 
-cd ..
-git clone https://github.com/latonaio/python-base-images.git
-cd python-base-images
-make docker-build-pylib-lite
-make docker-build-l4t
 ```
+
+#### pyhon-base-imagesのセットアップ
+
+```
+cd ..
+```
+
+pyhon-base-imagesのセットアップは<a href="https://github.com/latonaio/python-base-images">こちら</a>のREADMEを参照してください。
 
 ### envoy
 ```
