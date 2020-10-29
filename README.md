@@ -11,7 +11,8 @@ AIONのメインコンポーネント、マイクロサービスで利用する�
 - [セットアップ](#セットアップ)
     - [ディレクトリ](#ディレクトリ)
     - [kubernetes](#kubernetes)
-    - [aion-core](#aion-core)
+    - [AION](#AION)
+        - [aion-core](#aion-core)
     - [envoy](#envoy)
     - [project.yml](#project.yml)
         - [配置](#配置)        
@@ -133,7 +134,8 @@ kubectl taint nodes --all node-role.kubernetes.io/master-
 kubectl get node
 ```
 
-### aion-core
+### AION
+#### aion-core
 ```
 echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
 ```
@@ -166,7 +168,7 @@ make docker-build
 cd ..
 ```
 
-#### pyhon-base-imagesのセットアップ
+##### pyhon-base-imagesのセットアップ
 一部のマイクロサービスのDockerイメージには、以下のベースイメージが必要となります。
 - latonaio/l4t
 - latonaio/pylib-lite
