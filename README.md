@@ -13,10 +13,10 @@ AIONのメインコンポーネント、マイクロサービスで利用する�
     - [kubernetes](#kubernetes)
     - [AION](#AION)
         - [aion-core](#aion-core)
-    - [envoy](#envoy)
     - [project.yml](#project.yml)
         - [配置](#配置)        
         - [項目定義](#項目定義)  
+    - [envoy](#envoy)
 - [AIONの起動と停止](#AIONの起動と停止)
     - [aion-core-manifests](#aion-core-manifests)
     - [default](#default)
@@ -175,21 +175,21 @@ cd ..
 
 pyhon-base-imagesの<a href="https://github.com/latonaio/python-base-images">README</a>を参照し、これらのベースイメージを準備してください。
 
-
-### envoy
-```
-docker login
-docker pull envoyproxy/envoy:v1.16-latest
-docker tag latonaio/envoy:latest localhost:31112/envoy:latest
-```
-※ v1.16より古いバージョンのenvoyはarm64CPU上では動作しないため、バージョン指定を間違えないよう注意してください
-
 ### project.yml
 #### 配置
 project.ymlを配置します。
 ```
 project.ymlは/var/lib/aion/(namespace)/configの中に配置する。
 ```
+
+### envoy
+マイクロサービス間の通信に必要なため、EnvoyのDockerイメージを準備しておいてください。
+```
+docker login
+docker pull envoyproxy/envoy:v1.16-latest
+docker tag latonaio/envoy:latest localhost:31112/envoy:latest
+```
+※ v1.16より古いバージョンのenvoyはarm64CPU上では動作しないため、バージョン指定を間違えないよう注意してください
 
 #### 項目定義
 ```
