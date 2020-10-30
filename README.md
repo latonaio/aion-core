@@ -8,6 +8,10 @@ AIONのメインコンポーネント、マイクロサービスで利用する�
     - [前提条件](#前提条件)
 - [事前準備](#事前準備)
 - [hostnameの設定](#hostnameの設定)
+- [Databaseについて](#Databaseについて)
+    - [Redis](#Redis)
+    - [Mongo DB](#Mongo DB)
+    - [mysql](#mysql)
 - [セットアップ](#セットアップ)
     - [ディレクトリ](#ディレクトリ)
     - [kubernetes](#kubernetes)
@@ -57,6 +61,21 @@ hostnamectl set-hostname [new device name]
 ```
 hostnamectl
 ```
+
+## Databaseについて
+AIONでは以下のデータベースを採用しております。 aion-coreと同時にkubernetes上に展開されます。
+- Redis
+- Mongo DB
+
+### Redis
+AIONのRedisの役割は主に、マイクロサービスから別のマイクロサービスへデータを受け渡すKanbanの中継に利用されます。
+
+### Mongo DB
+AIONのMongo DBは各マイクロサービスのLogをKanban Replicatorを通して保存する役割を担っています。
+
+### mysql
+AIONではmysqlデータベースを使用する場合は別途デプロイが必要です。
+mysqlを立ち上げる場合は<a href="https://github.com/latonaio/mysql-kube">こちら</a>を参照してください。
 
 ## セットアップ
 ### ディレクトリ
