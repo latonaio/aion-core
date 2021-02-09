@@ -25,10 +25,10 @@ type Job struct {
 
 func NewJob(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8s *k8sResource) *Job {
+	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Job {
 
 	return &Job{
-		name:        k8s.getLabelName(serviceName, number),
+		name:        k8s.getLabelName(serviceName, number, targetNode),
 		serviceName: serviceName,
 		job:         k8s.client.BatchV1().Jobs(k8s.namespace),
 		k8s:         k8s,
@@ -43,15 +43,16 @@ func NewJob(
 			serviceAccount,
 			privileged,
 			k8s,
+			targetNode,
 		),
 	}
 }
 
 func (j *Job) Apply() error {
-	config := j.config()
+	jobConfig := j.config()
 
 	if _, err := j.job.Get(j.k8s.ctx, j.name, metaV1.GetOptions{}); err != nil {
-		result, err := j.job.Create(j.k8s.ctx, config, metaV1.CreateOptions{})
+		result, err := j.job.Create(j.k8s.ctx, jobConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply job is failed: %v", err)
 		}
@@ -79,7 +80,7 @@ func (j *Job) Apply() error {
 			return err
 		}
 
-		result, err := j.job.Create(j.k8s.ctx, config, metaV1.CreateOptions{})
+		result, err := j.job.Create(j.k8s.ctx, jobConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply job is failed: %v", err)
 		}
@@ -109,7 +110,7 @@ func (j *Job) config() *batchV1.Job {
 			Kind:       "job",
 			APIVersion: "batch/v1",
 		},
-		ObjectMeta: j.k8s.getObjectMeta(j.serviceName, j.pod.number),
+		ObjectMeta: j.k8s.getObjectMeta(j.serviceName, j.pod.number, j.pod.TargetNode),
 		Spec: batchV1.JobSpec{
 			Completions:             int32Ptr(1),
 			Parallelism:             int32Ptr(1),

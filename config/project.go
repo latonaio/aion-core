@@ -70,6 +70,7 @@ type Microservice struct {
 	VolumeMountPathList []string                         `yaml:"volumeMountPathList,omitempty"`
 	Privileged          bool                             `yaml:",omitempty"`
 	WithoutKanban       bool                             `yaml:"withoutKanban,omitempty"`
+	TargetNode          string                           `yaml:"targetNode,omitempty"`
 }
 
 type PortConfig struct {

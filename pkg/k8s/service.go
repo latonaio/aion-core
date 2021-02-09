@@ -26,7 +26,7 @@ type Service struct {
 func NewService(serviceName string, number int, ports []*config.PortConfig, network string, k8s *k8sResource) *Service {
 	return &Service{
 		serviceName: serviceName,
-		name:        fmt.Sprintf("%s-srv", k8s.getLabelName(serviceName, number)),
+		name:        fmt.Sprintf("%s-srv", k8s.getLabelName(serviceName, number, "")),
 		service:     k8s.client.CoreV1().Services(k8s.namespace),
 		number:      number,
 		ports:       ports,
@@ -36,10 +36,10 @@ func NewService(serviceName string, number int, ports []*config.PortConfig, netw
 }
 
 func (s *Service) Apply() error {
-	config := s.config()
+	svConfig := s.config()
 
 	if _, err := s.service.Get(s.k8s.ctx, s.name, metaV1.GetOptions{}); err != nil {
-		result, err := s.service.Create(s.k8s.ctx, config, metaV1.CreateOptions{})
+		result, err := s.service.Create(s.k8s.ctx, svConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] Created service is failed: %v", err)
 		}
@@ -48,7 +48,7 @@ func (s *Service) Apply() error {
 		if err := s.Delete(); err != nil {
 			return err
 		}
-		result, err := s.service.Create(s.k8s.ctx, config, metaV1.CreateOptions{})
+		result, err := s.service.Create(s.k8s.ctx, svConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] Created service is failed: %v", err)
 		}
@@ -80,16 +80,17 @@ func (s *Service) config() *apiV1.Service {
 			Name:   s.name,
 		},
 		Spec: apiV1.ServiceSpec{
-			Type:     s.getServiceType(),
-			Ports:    s.getPortConfigList(),
-			Selector: s.k8s.getLabelMap(s.serviceName, s.number),
+			Type:         s.getServiceType(),
+			Ports:        s.getPortConfigList(),
+			Selector:     s.k8s.getLabelMap(s.serviceName, s.number),
+			TopologyKeys: s.getTopologyKeys(),
 		},
 		Status: apiV1.ServiceStatus{},
 	}
 }
 
 func (s *Service) getLabelName(serviceName string, number int) string {
-	return fmt.Sprintf("%s-srv", s.k8s.getLabelName(serviceName, number))
+	return fmt.Sprintf("%s-srv", s.k8s.getLabelName(serviceName, number, ""))
 }
 
 func (s *Service) getPortConfigList() []apiV1.ServicePort {
@@ -141,4 +142,7 @@ func (s *Service) getServiceType() apiV1.ServiceType {
 	}
 
 	return serviceType
+}
+func (s *Service) getTopologyKeys() []string {
+	return []string{"kubernetes.io/hostname"}
 }

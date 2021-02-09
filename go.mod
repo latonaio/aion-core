@@ -7,7 +7,8 @@ require (
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-redis/redis/v7 v7.2.0
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/golang/mock v1.4.0
+	github.com/gogo/protobuf v1.3.1
+	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.1
 	github.com/gorilla/websocket v1.4.1
 	github.com/kelseyhightower/envconfig v1.4.0

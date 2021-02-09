@@ -34,6 +34,7 @@ func NewContainerMicroservice(msName string, data *config.Microservice, msNum in
 			data.ServiceAccount,
 			data.Privileged,
 			k8s.Get(),
+			data.TargetNode,
 		)
 	} else {
 		k = k8s.NewDeployment(
@@ -47,12 +48,13 @@ func NewContainerMicroservice(msName string, data *config.Microservice, msNum in
 			data.ServiceAccount,
 			data.Privileged,
 			k8s.Get(),
+			data.TargetNode,
 		)
 	}
 
 	return &ContainerMicroservice{
 		K8s:       k,
-		ConfigMap: k8s.NewConfigMap(msName, msNum, k8s.Get()),
+		ConfigMap: k8s.NewConfigMap(msName, msNum, k8s.Get(), data.TargetNode),
 		Service:   k8s.NewService(msName, msNum, data.Ports, data.Network, k8s.Get()),
 	}
 }

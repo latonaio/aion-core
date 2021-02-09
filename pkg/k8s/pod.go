@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"bitbucket.org/latonaio/aion-core/config"
+	"bitbucket.org/latonaio/aion-core/pkg/log"
 	apiV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,14 +31,15 @@ type Pod struct {
 	serviceAccount      string
 	privileged          bool
 	k8s                 *k8sResource
+	TargetNode          string
 }
 
 func NewPod(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8s *k8sResource) *Pod {
+	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Pod {
 
 	return &Pod{
-		name:                k8s.getLabelName(serviceName, number),
+		name:                k8s.getLabelName(serviceName, number, targetNode),
 		serviceName:         serviceName,
 		tag:                 tag,
 		number:              number,
@@ -48,6 +50,7 @@ func NewPod(
 		serviceAccount:      serviceAccount,
 		privileged:          privileged,
 		k8s:                 k8s,
+		TargetNode:          targetNode,
 	}
 }
 
@@ -69,7 +72,8 @@ func (p *Pod) config() apiV1.PodTemplateSpec {
 				p.getContainer(),
 				p.getEnvoyContainer(),
 			},
-			Volumes: p.getVolumeList(),
+			Volumes:      p.getVolumeList(),
+			NodeSelector: p.getNodeSelector(),
 		},
 	}
 }
@@ -202,7 +206,7 @@ func (p *Pod) getVolumeList() []apiV1.Volume {
 			VolumeSource: apiV1.VolumeSource{
 				ConfigMap: &apiV1.ConfigMapVolumeSource{
 					LocalObjectReference: apiV1.LocalObjectReference{
-						Name: "envoy-config-" + p.k8s.getLabelName(p.serviceName, p.number),
+						Name: "envoy-config-" + p.k8s.getLabelName(p.serviceName, p.number, p.TargetNode),
 					},
 				},
 			},
@@ -237,4 +241,12 @@ func (p *Pod) getHostAionDataPath() string {
 	}
 
 	return hostDataPath
+}
+
+func (p *Pod) getNodeSelector() map[string]string {
+	log.Printf("pod:%v,nodeSector:%v \n", p.name, p.TargetNode)
+	if p.TargetNode != "" {
+		return map[string]string{"kubernetes.io/hostname": p.TargetNode}
+	}
+	return nil
 }

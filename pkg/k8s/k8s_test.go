@@ -3,15 +3,16 @@
 package k8s
 
 import (
-	"bitbucket.org/latonaio/aion-core/config"
 	"context"
 	"fmt"
-	"github.com/avast/retry-go"
-	apiV1 "k8s.io/api/core/v1"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"bitbucket.org/latonaio/aion-core/config"
+	"github.com/avast/retry-go"
+	apiV1 "k8s.io/api/core/v1"
 )
 
 var (

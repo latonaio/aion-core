@@ -96,7 +96,16 @@ func (k *k8sResource) PodsWatcher() error {
 func int32Ptr(i int32) *int32 { return &i }
 func boolPrt(b bool) *bool    { return &b }
 
-func (k *k8sResource) getLabelName(serviceName string, number int) string {
+func (k *k8sResource) getLabelName(serviceName string, number int, targetNode string) string {
+	t := strings.Split(serviceName, "/")
+	t = strings.Split(t[len(t)-1], ":")
+	if targetNode == "" {
+		return fmt.Sprintf("%s-%03d", t[0], number)
+	}
+	return fmt.Sprintf("%s-%03d-%s", t[0], number, targetNode)
+}
+
+func (k *k8sResource) getLabelNameWithoutTargetNode(serviceName string, number int) string {
 	t := strings.Split(serviceName, "/")
 	t = strings.Split(t[len(t)-1], ":")
 	return fmt.Sprintf("%s-%03d", t[0], number)
@@ -104,14 +113,14 @@ func (k *k8sResource) getLabelName(serviceName string, number int) string {
 
 func (k *k8sResource) getLabelMap(serviceName string, number int) map[string]string {
 	return map[string]string{
-		"run": k.getLabelName(serviceName, number),
+		"run": k.getLabelNameWithoutTargetNode(serviceName, number),
 	}
 }
 
-func (k *k8sResource) getObjectMeta(serviceName string, number int) metaV1.ObjectMeta {
+func (k *k8sResource) getObjectMeta(serviceName string, number int, targetNode string) metaV1.ObjectMeta {
 	return metaV1.ObjectMeta{
 		Labels:    k.getLabelMap(serviceName, number),
-		Name:      k.getLabelName(serviceName, number),
+		Name:      k.getLabelName(serviceName, number, targetNode),
 		Namespace: k.namespace,
 	}
 }

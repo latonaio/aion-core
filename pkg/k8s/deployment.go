@@ -22,10 +22,10 @@ type Deployment struct {
 
 func NewDeployment(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8s *k8sResource) *Deployment {
+	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Deployment {
 
 	return &Deployment{
-		name:        k8s.getLabelName(serviceName, number),
+		name:        k8s.getLabelName(serviceName, number, targetNode),
 		serviceName: serviceName,
 		deployment:  k8s.client.AppsV1().Deployments(k8s.namespace),
 		k8s:         k8s,
@@ -40,21 +40,22 @@ func NewDeployment(
 			serviceAccount,
 			privileged,
 			k8s,
+			targetNode,
 		),
 	}
 }
 
 func (d *Deployment) Apply() error {
-	config := d.config()
+	dplConfig := d.config()
 
 	if _, err := d.deployment.Get(d.k8s.ctx, d.name, metaV1.GetOptions{}); err != nil {
-		result, err := d.deployment.Create(d.k8s.ctx, config, metaV1.CreateOptions{})
+		result, err := d.deployment.Create(d.k8s.ctx, dplConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply deployment is failed: %v", err)
 		}
 		log.Printf("[k8s] Created deployment %s", result.GetObjectMeta().GetName())
 	} else {
-		result, err := d.deployment.Update(d.k8s.ctx, config, metaV1.UpdateOptions{})
+		result, err := d.deployment.Update(d.k8s.ctx, dplConfig, metaV1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply deployment is failed: %v", err)
 		}
@@ -77,7 +78,7 @@ func (d *Deployment) Delete() error {
 
 func (d *Deployment) config() *appsV1.Deployment {
 	return &appsV1.Deployment{
-		ObjectMeta: d.k8s.getObjectMeta(d.serviceName, d.pod.number),
+		ObjectMeta: d.k8s.getObjectMeta(d.serviceName, d.pod.number, d.pod.TargetNode),
 		Spec: appsV1.DeploymentSpec{
 			Replicas: int32Ptr(1),
 			Selector: &metaV1.LabelSelector{
