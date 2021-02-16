@@ -15,6 +15,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/pkg/sftp v1.11.0
 	github.com/rakyll/statik v0.1.7
+	github.com/spf13/cobra v0.0.3
 	go.mongodb.org/mongo-driver v1.3.5
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect

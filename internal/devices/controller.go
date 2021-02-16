@@ -2,11 +2,9 @@
 package devices
 
 import (
-	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
-	"fmt"
 	"google.golang.org/grpc"
 	"time"
 )
@@ -94,22 +92,16 @@ func (c *Controller) connectToServer(ctx context.Context) {
 	}
 }
 
-func (c *Controller) SendFileToDevice(deviceName string, k *kanbanpb.StatusKanban, nextService string, number int) error {
-	deviceData, ok := config.GetInstance().GetDeviceList()[deviceName]
-	if !ok {
-		return fmt.Errorf("there is no device config: %s", deviceName)
-	}
-
+func (c *Controller) SendFileToDevice(deviceName string, k *kanbanpb.StatusKanban, nextService string, number int, addr string) {
 	data := &kanbanpb.SendKanban{
 		DeviceName:  deviceName,
-		DeviceAddr:  deviceData.Addr,
+		DeviceAddr:  addr,
 		NextService: nextService,
 		NextNumber:  int32(number),
 		AfterKanban: k,
 	}
 	c.sendCh <- data
 	log.Printf("set to sending queue of send-anything : %s", nextService)
-	return nil
 }
 
 func (c *Controller) GetReceiveKanbanCh() chan *kanbanpb.SendKanban {

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package servicepb;
+
+message Microservice {
+
+    repeated string command = 1;
+    map<string, NextService> nextService = 2;
+    int32 Scale = 3;
+    map<string, string> env = 4;
+    string position = 5;
+    bool always = 6;
+    bool multiple = 7;
+    bool docker = 8;
+    bool startup = 9;
+    int32 interval = 10;
+    repeated PortConfig ports = 11;
+    string dirPath = 12;
+    string serviceAccount = 13;
+    string network = 14;
+    string tag = 15;
+    repeated string volumeMountPathList = 16;
+    bool privileged = 17;
+    bool withoutKanban = 18;
+    string targetNode = 19;
+}
+
+message PortConfig {
+    string name = 1;
+    string protocol = 2;
+    int32 port = 3;
+    int32 nodePort = 4;
+}
+
+message NextService {
+    repeated NextServiceSetting nextServiceSetting = 1;
+}
+message NextServiceSetting {
+    string nextServiceName = 1;
+    string numberPattern = 2;
+    string nextDevice = 3;
+}

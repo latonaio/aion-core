@@ -17,31 +17,36 @@ import (
 )
 
 type Watcher struct {
-	kanban.Adaptor
+	kanban.Adapter
 }
 
 func NewRequestRedisWatcher() *Watcher {
 	return newWatcher(kanban.NewRedisAdapter())
 }
 
-func newWatcher(io kanban.Adaptor) *Watcher {
+func newWatcher(io kanban.Adapter) *Watcher {
 	return &Watcher{
-		Adaptor: io,
+		Adapter: io,
 	}
 }
 
-func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int, statusType kanban.StatusType) error {
-	kanbanCh, err := w.WatchKanban(msName, msNumber, statusType)
+func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int, statusType kanban.StatusType) {
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, statusType)
 	if err != nil {
-		return err
+		log.Printf("[ERR] %v", err)
+		return
 	}
 	streamKey := getStreamKey(msName, msNumber, statusType)
-	go func() {
-		for k := range kanbanCh {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case k := <-kanbanCh:
 			w.WriteKanbanMongo(ctx, k, streamKey)
 		}
-	}()
-	return nil
+	}
 }
 
 func (w *Watcher) WriteKanbanMongo(ctx context.Context, kanban *kanbanpb.StatusKanban, streamKey string) error {

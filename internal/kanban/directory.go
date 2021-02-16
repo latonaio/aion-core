@@ -5,6 +5,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/pkg/fswatcher"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
+	"context"
 	"fmt"
 	"github.com/avast/retry-go"
 	"github.com/golang/protobuf/jsonpb"
@@ -16,7 +17,7 @@ import (
 	"strings"
 )
 
-func NewFileAdapter(aionDataPath string) Adaptor {
+func NewFileAdapter(aionDataPath string) Adapter {
 	return &FileAdapter{aionDataPath: aionDataPath}
 }
 
@@ -50,7 +51,7 @@ func convertStatusType(statusType StatusType) string {
 	}
 }
 
-func (fa *FileAdapter) WatchKanban(msName string, msNumber int, statusType StatusType) (chan *kanbanpb.StatusKanban, error) {
+func (fa *FileAdapter) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (chan *kanbanpb.StatusKanban, error) {
 	dataPath, err := fa.getPath(msName, msNumber, true)
 	if err != nil {
 		return nil, fmt.Errorf("cant watch kanban, because directory does not exist: %s", dataPath)
@@ -68,16 +69,22 @@ func (fa *FileAdapter) WatchKanban(msName string, msNumber int, statusType Statu
 
 	resCh := make(chan *kanbanpb.StatusKanban)
 	go func() {
-		for kanbanPath := range watcher.GetFilePathCh() {
-			if strings.Split(path.Base(kanbanPath), "_")[0] != convertStatusType(statusType) {
-				continue
+		for {
+			select {
+			case <-ctx.Done():
+				close(resCh)
+				return
+			case kanbanPath := <-watcher.GetFilePathCh():
+				if strings.Split(path.Base(kanbanPath), "_")[0] != convertStatusType(statusType) {
+					continue
+				}
+				kanban, err := fa.ReadKanban(msName, msNumber, statusType)
+				if err != nil {
+					log.Printf("cant get kanban: %v", err)
+					continue
+				}
+				resCh <- kanban
 			}
-			kanban, err := fa.ReadKanban(msName, msNumber, statusType)
-			if err != nil {
-				log.Printf("cant get kanban: %v", err)
-				continue
-			}
-			resCh <- kanban
 		}
 	}()
 

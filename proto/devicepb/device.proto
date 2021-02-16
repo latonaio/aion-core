@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package devicepb;
+
+message Device {
+    string Addr = 1;
+    int32 SSHPort = 2;
+    string Username = 3;
+    string Password = 4;
+    string AionHome = 5;
+}

@@ -9,6 +9,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
+	"context"
 	"fmt"
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
@@ -37,7 +38,7 @@ func NewServer(env *Env) error {
 	}
 
 	kaep := keepalive.EnforcementPolicy{
-		MinTime:             15 * time.Second,
+		MinTime:             5 * time.Minute,
 		PermitWithoutStream: true,
 	}
 
@@ -106,7 +107,7 @@ loop:
 				break loop
 			}
 			// call message parser
-			go srv.parseRequestMessage(session, m)
+			go srv.parseRequestMessage(ctx, session, m)
 		}
 	}
 
@@ -114,7 +115,7 @@ loop:
 	return nil
 }
 
-func (srv *Server) parseRequestMessage(session *Session, m *kanbanpb.Request) {
+func (srv *Server) parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) {
 	streamRes := &kanbanpb.Response{}
 	switch m.MessageType {
 	case kanbanpb.RequestType_START_SERVICE:
@@ -125,7 +126,7 @@ func (srv *Server) parseRequestMessage(session *Session, m *kanbanpb.Request) {
 			break
 		}
 		session.ReadKanban(p, streamRes)
-		if err := session.StartKanbanWatcher(); err != nil {
+		if err := session.StartKanbanWatcher(ctx); err != nil {
 			log.Printf("cant start kanban watcher: %v", err)
 		}
 
@@ -138,7 +139,7 @@ func (srv *Server) parseRequestMessage(session *Session, m *kanbanpb.Request) {
 			break
 		}
 		session.SetKanban(p, streamRes)
-		if err := session.StartKanbanWatcher(); err != nil {
+		if err := session.StartKanbanWatcher(ctx); err != nil {
 			log.Printf("cant start kanban watcher: %v", err)
 		}
 	case kanbanpb.RequestType_OUTPUT_AFTER_KANBAN:

@@ -135,7 +135,7 @@ func (p *Pod) getPortList() []apiV1.ContainerPort {
 		portConfig := apiV1.ContainerPort{
 			Name:          port.Name,
 			ContainerPort: port.Port,
-			Protocol:      port.Protocol,
+			Protocol:      apiV1.Protocol(port.Protocol),
 		}
 		portConfigList = append(portConfigList, portConfig)
 	}

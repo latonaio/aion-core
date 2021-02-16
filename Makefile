@@ -20,6 +20,9 @@ required-package:
 	go get -v github.com/rakyll/statik
 	statik -src template -f
 
+go-cli-install: $(GO_SRCS)
+	go install ./cmd/aionctl
+
 go-build: $(GO_SRCS)
 	go build ./cmd/service-broker
 	go build ./cmd/kanban-server
@@ -59,7 +62,10 @@ python-proto: proto
 	rm $(PY_PROTO_DIR)/*.proto
 
 go-proto: proto
-	protoc --go_out=plugins:. ./proto/kanbanpb/status.proto
+	protoc --go_out=plugins=grpc:. ./proto/kanbanpb/status.proto
+	protoc --go_out=plugins=grpc:. ./proto/devicepb/device.proto
+	protoc --go_out=plugins=grpc:. ./proto/servicepb/service.proto
+	protoc -I${GOPATH}/src -I./proto/projectpb --go_out=plugins=grpc:./proto/projectpb ./proto/projectpb/project.proto
 
 ################## initialized grafana (required root permission)
 # init-grafana:

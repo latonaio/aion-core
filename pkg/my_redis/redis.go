@@ -62,8 +62,7 @@ func (rc *RedisClient) Close() error {
 	return nil
 }
 
-func (rc *RedisClient) XRead(
-	streamKeys []string, ids []string, count int, block time.Duration) ([]redis.XStream, error) {
+func (rc *RedisClient) XRead(streamKeys []string, ids []string, count int, block time.Duration) ([]redis.XStream, error) {
 	return rc.client.XRead(&redis.XReadArgs{
 		Streams: append(streamKeys, ids...),
 		Count:   int64(count),
@@ -71,8 +70,7 @@ func (rc *RedisClient) XRead(
 	}).Result()
 }
 
-func (rc *RedisClient) XReadOne(
-	streamKeys []string, ids []string, count int, block time.Duration) (map[string]interface{}, string, error) {
+func (rc *RedisClient) XReadOne(streamKeys []string, ids []string, count int, block time.Duration) (map[string]interface{}, string, error) {
 	ret, err := rc.client.XRead(&redis.XReadArgs{
 		Streams: append(streamKeys, ids...),
 		Count:   int64(count),

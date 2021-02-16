@@ -43,26 +43,26 @@ func GetConfig() *Config {
 	return &conf
 }
 
-func (c *Config) getAionHome() string {
+func (c *Config) GetAionHome() string {
 	return c.env.AionHome
 }
 
-func (c *Config) getRedisAddr() string {
+func (c *Config) GetRedisAddr() string {
 	return c.env.RedisAddr
 }
 
-func (c *Config) getMongoAddr() string {
+func (c *Config) GetMongoAddr() string {
 	return c.env.MongoAddr
 }
 
-func (c *Config) getConfigPath() string {
+func (c *Config) GetConfigPath() string {
 	return *c.configPath
 }
 
-func (c *Config) getKanbanDB() string {
+func (c *Config) GetKanbanDB() string {
 	return c.env.KanbanDB
 }
 
-func (c *Config) getKanbanCollection() string {
+func (c *Config) GetKanbanCollection() string {
 	return c.env.KanbanCollection
 }

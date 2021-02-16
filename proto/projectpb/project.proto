@@ -1,0 +1,31 @@
+syntax =  "proto3";
+
+package projectpb;
+
+import "bitbucket.org/latonaio/aion-core/proto/servicepb/service.proto";
+import "bitbucket.org/latonaio/aion-core/proto/devicepb/device.proto";
+
+service Project {
+   rpc Apply (AionSetting) returns (Response) {}
+   rpc Delete (AionSetting) returns (Response) {}
+   rpc Get (Empty) returns (stream AionSetting) {}
+}
+
+message Empty {}
+
+message AionSetting {
+    map<string, servicepb.Microservice> Microservices = 1;
+    map<string, devicepb.Device> Devices = 2;
+    string DeviceName = 3;
+}
+
+enum ResponseCode {
+    Unknown = 0;
+    OK = 1;
+    Failed = 2;
+}
+
+message Response {
+    string Message = 1;
+    ResponseCode Code = 2;
+}

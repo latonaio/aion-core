@@ -3,14 +3,18 @@ package main
 
 import (
 	"context"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"bitbucket.org/latonaio/aion-core/cmd/service-broker/app"
 	"bitbucket.org/latonaio/aion-core/config"
+	"bitbucket.org/latonaio/aion-core/internal/services"
 	"bitbucket.org/latonaio/aion-core/pkg/k8s"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	pb "bitbucket.org/latonaio/aion-core/proto/projectpb"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -18,7 +22,8 @@ func main() {
 	log.SetFormat("service-broker")
 	env := app.GetConfig()
 
-	if err := config.GetInstance().LoadConfig(env.GetConfigPath(), env.IsDocker()); err != nil {
+	ya, err := config.LoadConfigFromDirectory(env.GetConfigPath(), env.IsDocker())
+	if err != nil {
 		log.Fatalf("cant open yaml file (path: %s): %v", env.GetConfigPath(), err)
 	}
 
@@ -30,21 +35,35 @@ func main() {
 		}
 	}
 
-	msc, err := app.StartMicroservicesController(ctx, env)
+	aionCh := make(chan *config.AionSetting)
+	msc, err := app.StartMicroservicesController(ctx, env, aionCh)
 	if err != nil {
 		log.Fatalf("cant start microservice controller: %v", err)
+	}
+
+	aionCh <- ya
+
+	lis, err := net.Listen("tcp", ":11111")
+	if err != nil {
+		log.Fatalf("cant start server")
+	}
+	s := grpc.NewServer()
+	server := &services.ProjectServer{AionCh: aionCh, IsDocker: env.IsDocker()}
+	pb.RegisterProjectServer(s, server)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("cant start server")
 	}
 
 	signalCh := make(chan os.Signal)
 	signal.Notify(signalCh, syscall.SIGTERM)
 
-loop:
 	for {
 		select {
 		case s := <-signalCh:
 			log.Printf("recieved signal: %s", s.String())
 			msc.StopAllMicroservice()
-			break loop
+			goto END
 		}
 	}
+END:
 }

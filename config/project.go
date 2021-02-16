@@ -3,24 +3,11 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 
-	"gopkg.in/yaml.v2"
-	apiV1 "k8s.io/api/core/v1"
+	"bitbucket.org/latonaio/aion-core/proto/devicepb"
+	"bitbucket.org/latonaio/aion-core/proto/projectpb"
+	"bitbucket.org/latonaio/aion-core/proto/servicepb"
 )
-
-var instance = &Config{
-	&AionSetting{},
-}
-
-func GetInstance() *Config {
-	return instance
-}
-
-type Config struct {
-	ServiceConfigContainer
-}
 
 type ServiceConfigContainer interface {
 	GetMicroserviceList() map[string]*Microservice
@@ -28,7 +15,6 @@ type ServiceConfigContainer interface {
 	GetNextServiceList(name string, connectionKey string) ([]*NextServiceSetting, error)
 	GetDeviceName() string
 	GetDeviceList() map[string]*Device
-	LoadConfig(confPath string, isDocker bool) error
 }
 
 const (
@@ -46,76 +32,30 @@ const (
 )
 
 type AionSetting struct {
-	Microservices map[string]*Microservice `yaml:""`
-	Devices       map[string]*Device       `yaml:",omitempty"`
-	DeviceName    string                   `yaml:"deviceName,omitempty"`
+	Aion *projectpb.AionSetting
 }
 
-type Microservice struct {
-	Command             []string                         `yaml:",omitempty"`
-	NextService         map[string][]*NextServiceSetting `yaml:"nextService,omitempty"`
-	Scale               int                              `yaml:",omitempty"`
-	Env                 map[string]string                `yaml:",omitempty"`
-	Position            Position                         `yaml:",omitempty"`
-	Always              bool                             `yaml:",omitempty"`
-	Multiple            bool                             `yaml:",omitempty"`
-	Docker              bool                             `yaml:",omitempty"`
-	Startup             bool                             `yaml:",omitempty"`
-	Interval            int                              `yaml:",omitempty"`
-	Ports               []*PortConfig                    `yaml:",omitempty"`
-	DirPath             string                           `yaml:"directoryPath,omitempty"`
-	ServiceAccount      string                           `yaml:"serviceAccount,omitempty"`
-	Network             string                           `yaml:",omitempty"`
-	Tag                 string                           `yaml:",omitempty"`
-	VolumeMountPathList []string                         `yaml:"volumeMountPathList,omitempty"`
-	Privileged          bool                             `yaml:",omitempty"`
-	WithoutKanban       bool                             `yaml:"withoutKanban,omitempty"`
-	TargetNode          string                           `yaml:"targetNode,omitempty"`
-}
+type Microservice = servicepb.Microservice
 
-type PortConfig struct {
-	Name     string         `yaml:""`
-	Protocol apiV1.Protocol `yaml:",omitempty"`
-	Port     int32          `yaml:""`
-	NodePort int32          `yaml:"nodePort,omitempty"`
-}
+type PortConfig = servicepb.PortConfig
 
-func (m *Microservice) GetPosition() string {
-	return string(m.Position)
-}
+type NextServiceSetting = servicepb.NextServiceSetting
 
-type NextServiceSetting struct {
-	NextServiceName string          `yaml:"name"`
-	NumberPattern   msNumberPattern `yaml:"pattern"`
-	NextDevice      string          `yaml:"device,omitempty"`
-}
-
-type Position string
+type Device = devicepb.Device
 
 const (
-	Runtime        Position = "Runtime"
-	BackendService Position = "BackendService"
-	UI             Position = "UI"
+	Runtime        string = "Runtime"
+	BackendService string = "BackendService"
+	UI             string = "UI"
 )
-
-type msNumberPattern string
 
 const (
-	DefaultNumber msNumberPattern = "0"
-	Spread        msNumberPattern = "n"
+	DefaultNumber string = "0"
+	Spread        string = "n"
 )
-
-// Device ... edge device params
-type Device struct {
-	Addr     string `yaml:""`
-	SSHPort  int16  `yaml:"sshPort,omitempty"`
-	Username string `yaml:",omitempty"`
-	Password string `yaml:",omitempty"`
-	AionHome string `yaml:"aionHome,omitempty"`
-}
 
 func GetNextNumber(
-	previousNumber int32, msNumberPattern msNumberPattern) int {
+	previousNumber int32, msNumberPattern string) int {
 	switch msNumberPattern {
 	case DefaultNumber:
 		return 1
@@ -126,27 +66,35 @@ func GetNextNumber(
 	}
 }
 
-func (ya *AionSetting) LoadConfig(configPath string, isDocker bool) error {
-	f, err := os.Open(configPath)
+func LoadConfigFromDirectory(configPath string, isDocker bool) (*AionSetting, error) {
+	/*
+	 * 本来ならProtocol Bufferで定義されたモデルをそのまま使うべきだが、
+	 * 既存のproject.yamlがProtocol Buffetで表現できない
+	 * Protocol Bufferでyaml mappingができない
+	 * という2つの理由から、yaml読み込み用のモデルを定義して読み込んだ後、
+	 * Protocol Bufferで定義されたモデルにマッピングしている。
+	 */
+	aion, err := LoadConfigFromFile(configPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer f.Close()
-	b, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
+	aionSetting := &AionSetting{aion}
+	if err := aionSetting.setInitializeValue(isDocker); err != nil {
+		return nil, err
 	}
-	if err := yaml.Unmarshal(b, ya); err != nil {
-		return err
+	return aionSetting, nil
+}
+
+func LoadConfigFromGRPC(project *projectpb.AionSetting, isDocker bool) (*AionSetting, error) {
+	aionSetting := &AionSetting{Aion: project}
+	if err := aionSetting.setInitializeValue(isDocker); err != nil {
+		return nil, err
 	}
-	if err := ya.setInitializeValue(isDocker); err != nil {
-		return err
-	}
-	return nil
+	return aionSetting, nil
 }
 
 func (ya *AionSetting) GetMicroserviceByName(name string) (*Microservice, error) {
-	ms, ok := ya.Microservices[name]
+	ms, ok := ya.Aion.Microservices[name]
 	if !ok {
 		return nil, fmt.Errorf("there is no microservice: %s", name)
 	}
@@ -154,34 +102,34 @@ func (ya *AionSetting) GetMicroserviceByName(name string) (*Microservice, error)
 }
 
 func (ya *AionSetting) GetNextServiceList(name string, connectionKey string) ([]*NextServiceSetting, error) {
-	ms, ok := ya.Microservices[name]
+	ms, ok := ya.Aion.Microservices[name]
 	if !ok {
 		return nil, fmt.Errorf("there is no microservice: %s", name)
 	}
 	if cl, ok := ms.NextService[connectionKey]; ok {
-		return cl, nil
+		return cl.NextServiceSetting, nil
 		// get default key
 	} else if cl, ok := ms.NextService[DefaultConnectionKey]; ok {
-		return cl, nil
+		return cl.NextServiceSetting, nil
 	}
 	return nil, fmt.Errorf(
 		"invalid connection key (connectionkey: %s)", connectionKey)
 }
 
 func (ya *AionSetting) GetMicroserviceList() map[string]*Microservice {
-	return ya.Microservices
+	return ya.Aion.Microservices
 }
 
 func (ya *AionSetting) GetDeviceName() string {
-	return ya.DeviceName
+	return ya.Aion.DeviceName
 }
 
 func (ya *AionSetting) GetDeviceList() map[string]*Device {
-	return ya.Devices
+	return ya.Aion.Devices
 }
 
 func (ya *AionSetting) setInitializeValue(isDocker bool) error {
-	for _, val := range ya.Devices {
+	for _, val := range ya.Aion.Devices {
 		if val.AionHome == "" {
 			val.AionHome = DefaultAionHome
 		}
@@ -196,7 +144,7 @@ func (ya *AionSetting) setInitializeValue(isDocker bool) error {
 		}
 	}
 
-	for _, msData := range ya.Microservices {
+	for _, msData := range ya.Aion.Microservices {
 		if msData == nil {
 			return fmt.Errorf("yaml format is wrong")
 		}
@@ -216,7 +164,7 @@ func (ya *AionSetting) setInitializeValue(isDocker bool) error {
 			msData.Env = map[string]string{}
 		}
 		if msData.NextService == nil {
-			msData.NextService = map[string][]*NextServiceSetting{}
+			msData.NextService = map[string]*servicepb.NextService{}
 		}
 		if msData.Tag == "" {
 			msData.Tag = DefaultTag
@@ -226,7 +174,7 @@ func (ya *AionSetting) setInitializeValue(isDocker bool) error {
 		}
 
 		for _, nextKey := range msData.NextService {
-			for _, nextMs := range nextKey {
+			for _, nextMs := range nextKey.NextServiceSetting {
 				if nextMs.NumberPattern == "" {
 					nextMs.NumberPattern = DefaultProcessPattern
 				}

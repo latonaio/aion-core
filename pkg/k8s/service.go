@@ -111,7 +111,7 @@ func (s *Service) getPortConfigList() []apiV1.ServicePort {
 		case "NodePort":
 			portConfig = apiV1.ServicePort{
 				Name:       port.Name,
-				Protocol:   port.Protocol,
+				Protocol:   apiV1.Protocol(port.Protocol),
 				Port:       port.Port,
 				TargetPort: intstr.FromInt(int(port.Port)),
 				NodePort:   port.NodePort,
@@ -120,7 +120,7 @@ func (s *Service) getPortConfigList() []apiV1.ServicePort {
 		default:
 			portConfig = apiV1.ServicePort{
 				Name:       port.Name,
-				Protocol:   port.Protocol,
+				Protocol:   apiV1.Protocol(port.Protocol),
 				Port:       port.Port,
 				TargetPort: intstr.FromInt(int(port.Port)),
 			}

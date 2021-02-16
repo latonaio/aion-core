@@ -1,6 +1,8 @@
 microservices:
   test:
-    command: python3 main.py
+    command:
+      - "python3"
+      -  "main.py"
     position: Runtime
     always: yes
     multiple: yes
@@ -11,6 +13,8 @@ microservices:
     env:
       env1: test
       env2: test
+    volumeMountPathList:
+      - "/dev:/device:Bidirectional"
     nextService:
       default:
         - name: test2
@@ -18,11 +22,11 @@ microservices:
           device: other
         - name: test3
   test2:
-    command: "python3 main.py"
+    command: ["python3", "main.py"]
 devices:
   other:
     addr: 127.0.0.1
-    ssh_port: 22
+    sshPort: 22
     username: aion
     password: aion
     aionHome: /var/lib/aion

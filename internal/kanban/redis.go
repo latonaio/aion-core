@@ -1,6 +1,7 @@
 package kanban
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 )
 
-func NewRedisAdapter() Adaptor {
+func NewRedisAdapter() Adapter {
 	return &RedisAdaptor{
 		prevID: "0",
 	}
@@ -58,8 +59,7 @@ func unmarshalKanban(hash map[string]interface{}) (*kanbanpb.StatusKanban, error
 
 func (a *RedisAdaptor) ReadKanban(msName string, msNumber int, statusType StatusType) (*kanbanpb.StatusKanban, error) {
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
-	hash, newID, err := my_redis.GetInstance().XReadOne(
-		[]string{streamKey}, []string{a.prevID}, 1, -1)
+	hash, newID, err := my_redis.GetInstance().XReadOne([]string{streamKey}, []string{a.prevID}, 1, -1)
 	if err != nil {
 		return nil, fmt.Errorf("[read kanban] cant get by redis(key: %s): %v", streamKey, err)
 	}
@@ -93,26 +93,31 @@ func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb
 	return nil
 }
 
-func (a *RedisAdaptor) WatchKanban(msName string, msNumber int, statusType StatusType) (chan *kanbanpb.StatusKanban, error) {
+func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (chan *kanbanpb.StatusKanban, error) {
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 	ch := make(chan *kanbanpb.StatusKanban)
 	go func() {
 		for {
-			hash, nextID, err := my_redis.GetInstance().XReadOne(
-				[]string{streamKey}, []string{a.prevID}, 1, 0)
-			if err != nil {
-				log.Printf(
-					"[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
+			select {
+			case <-ctx.Done():
+				close(ch)
 				return
+			default:
+				hash, nextID, err := my_redis.GetInstance().XReadOne([]string{streamKey}, []string{a.prevID}, 1, 0)
+				if err != nil {
+					log.Printf(
+						"[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
+					return
+				}
+				a.prevID = nextID
+				k, err := unmarshalKanban(hash)
+				if err != nil {
+					log.Printf("[watch kanban] %v (streamKey: %s)", err, streamKey)
+					continue
+				}
+				log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
+				ch <- k
 			}
-			a.prevID = nextID
-			k, err := unmarshalKanban(hash)
-			if err != nil {
-				log.Printf("[watch kanban] %v (streamKey: %s)", err, streamKey)
-				continue
-			}
-			log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
-			ch <- k
 		}
 	}()
 	return ch, nil

@@ -12,7 +12,7 @@ import (
 )
 
 type Session struct {
-	io               kanban.Adaptor
+	io               kanban.Adapter
 	microserviceName string
 	cacheKanban      *kanbanpb.StatusKanban
 	processNumber    int
@@ -32,7 +32,7 @@ func NewMicroserviceSessionWithFile(ctx context.Context, dataPath string) *Sessi
 }
 
 // create struct of session with service broker
-func newSession(ctx context.Context, io kanban.Adaptor) *Session {
+func newSession(ctx context.Context, io kanban.Adapter) *Session {
 	sendCh := make(chan *kanbanpb.Response)
 	return &Session{
 		io:               io, // kanban io ( redis or directory )
@@ -45,8 +45,8 @@ func newSession(ctx context.Context, io kanban.Adaptor) *Session {
 }
 
 // start kanban watcher
-func (s *Session) StartKanbanWatcher() error {
-	ch, err := s.io.WatchKanban(s.microserviceName, s.processNumber, kanban.StatusType_Before)
+func (s *Session) StartKanbanWatcher(ctx context.Context) error {
+	ch, err := s.io.WatchKanban(ctx, s.microserviceName, s.processNumber, kanban.StatusType_Before)
 	if err != nil {
 		return err
 	}
@@ -55,20 +55,25 @@ func (s *Session) StartKanbanWatcher() error {
 		currentServiceData := &kanbanpb.ServiceData{
 			Name: s.microserviceName,
 		}
-		for kanban := range ch {
-			anyMsg, err := ptypes.MarshalAny(kanban)
-			if err != nil {
-				log.Printf("[kanban Watcher] cant unmarchal status kanban to any message")
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case kanban := <-ch:
+				anyMsg, err := ptypes.MarshalAny(kanban)
+				if err != nil {
+					log.Printf("[kanban Watcher] cant unmarchal status kanban to any message")
+				}
+				s.cacheKanban = kanban
+				s.cacheKanban.Services = append(s.cacheKanban.Services, currentServiceData)
+				res := &kanbanpb.Response{
+					MessageType: kanbanpb.ResponseType_RES_CACHE_KANBAN,
+					Message:     anyMsg,
+				}
+				log.Printf("[KanbanWatcher] success to read kanban: (ms:%s, number:%d)",
+					s.microserviceName, s.processNumber)
+				s.sendCh <- res
 			}
-			s.cacheKanban = kanban
-			s.cacheKanban.Services = append(s.cacheKanban.Services, currentServiceData)
-			res := &kanbanpb.Response{
-				MessageType: kanbanpb.ResponseType_RES_CACHE_KANBAN,
-				Message:     anyMsg,
-			}
-			log.Printf("[KanbanWatcher] success to read kanban: (ms:%s, number:%d)",
-				s.microserviceName, s.processNumber)
-			s.sendCh <- res
 		}
 	}()
 	return nil
