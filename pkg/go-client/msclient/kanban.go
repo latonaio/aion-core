@@ -9,10 +9,12 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+// WrapKanban defines status kanban object wrapper.
 type WrapKanban struct {
 	kanbanpb.StatusKanban
 }
 
+// GetMetadataByMap gets metadata.
 func (k *WrapKanban) GetMetadataByMap() (map[string]interface{}, error) {
 	var ret map[string]interface{}
 

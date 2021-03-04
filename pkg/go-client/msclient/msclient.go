@@ -20,8 +20,10 @@ import (
 	"time"
 )
 
+// Option defines type of function that sets data to output request.
 type Option func(*kanbanpb.OutputRequest) error
 
+// NewOutputData constructs output request to kanban.
 func NewOutputData(options ...Option) (*kanbanpb.OutputRequest, error) {
 	d := &kanbanpb.OutputRequest{
 		PriorSuccess:  true,
@@ -40,6 +42,7 @@ func NewOutputData(options ...Option) (*kanbanpb.OutputRequest, error) {
 	return d, nil
 }
 
+// SetResult returns option that microservice processing result.
 func SetResult(r bool) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		d.PriorSuccess = r
@@ -47,6 +50,7 @@ func SetResult(r bool) Option {
 	}
 }
 
+// SetDataPath returns option that data path.
 func SetDataPath(p string) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		d.DataPath = p
@@ -54,6 +58,7 @@ func SetDataPath(p string) Option {
 	}
 }
 
+// SetConnectionKey returns option that connection key.
 func SetConnectionKey(k string) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		d.ConnectionKey = k
@@ -61,6 +66,7 @@ func SetConnectionKey(k string) Option {
 	}
 }
 
+// SetProcessNumber returns option that process number of microservice.
 func SetProcessNumber(n int) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		d.ProcessNumber = int32(n)
@@ -68,6 +74,7 @@ func SetProcessNumber(n int) Option {
 	}
 }
 
+// SetFileList returns option that file list.
 func SetFileList(l []string) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		d.FileList = l
@@ -75,6 +82,7 @@ func SetFileList(l []string) Option {
 	}
 }
 
+// SetMetadata converts metadata to format accept by kanban and returns option.
 func SetMetadata(in map[string]interface{}) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		b, err := json.Marshal(in)
@@ -90,6 +98,7 @@ func SetMetadata(in map[string]interface{}) Option {
 	}
 }
 
+// SetDeviceName returns option that device name.
 func SetDeviceName(n string) Option {
 	return func(d *kanbanpb.OutputRequest) error {
 		d.DeviceName = n
@@ -97,6 +106,7 @@ func SetDeviceName(n string) Option {
 	}
 }
 
+// MicroserviceClient declares communication function between kanban and microservice.
 type MicroserviceClient interface {
 	GetOneKanban(serviceName string, processNumber int) (*WrapKanban, error)
 	GetKanbanCh(serviceName string, processNumber int) (chan *WrapKanban, error)
@@ -106,6 +116,7 @@ type MicroserviceClient interface {
 	GetProcessNumber() int
 }
 
+// microserviceClient implements communication function between kanban and microservice.
 type microserviceClient struct {
 	stream       kanbanpb.Kanban_MicroserviceConnClient
 	conn         *grpc.ClientConn
@@ -115,12 +126,14 @@ type microserviceClient struct {
 	recvKanbanCh chan *WrapKanban
 }
 
+// Env has environment information.
 type Env struct {
 	KanbanAddr string
 	MsNumber   int
 	IsDocker   bool
 }
 
+// NewKanbanClient constructs kanban client object.
 func NewKanbanClient(ctx context.Context) (MicroserviceClient, error) {
 	// get env
 	var env Env
@@ -240,6 +253,7 @@ func (k *microserviceClient) sendKanbanRequest(messageType kanbanpb.RequestType,
 	return nil
 }
 
+// SetKanban sets service name and process number to kanban.
 func (k *microserviceClient) SetKanban(serviceName string, processNumber int) (*WrapKanban, error) {
 	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN, serviceName, processNumber); err != nil {
 		return nil, err
@@ -255,6 +269,7 @@ func (k *microserviceClient) SetKanban(serviceName string, processNumber int) (*
 	}
 }
 
+// GetOneKanban gets one kanban.
 func (k *microserviceClient) GetOneKanban(serviceName string, processNumber int) (*WrapKanban, error) {
 	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE, serviceName, processNumber); err != nil {
 		return nil, err
@@ -270,6 +285,7 @@ func (k *microserviceClient) GetOneKanban(serviceName string, processNumber int)
 	}
 }
 
+// GetKanbanCh gets kanban channel.
 func (k *microserviceClient) GetKanbanCh(serviceName string, processNumber int) (chan *WrapKanban, error) {
 	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE, serviceName, processNumber); err != nil {
 		return nil, err
@@ -277,6 +293,7 @@ func (k *microserviceClient) GetKanbanCh(serviceName string, processNumber int) 
 	return k.recvKanbanCh, nil
 }
 
+// OutputKanban outputs request to kanban.
 func (k *microserviceClient) OutputKanban(data *kanbanpb.OutputRequest) error {
 	if err := k.sendRequest(kanbanpb.RequestType_OUTPUT_AFTER_KANBAN, data); err != nil {
 		return fmt.Errorf("output kanban is failed: %v", err)
@@ -292,6 +309,7 @@ func (k *microserviceClient) OutputKanban(data *kanbanpb.OutputRequest) error {
 	return nil
 }
 
+// Close closes the microservice client.
 func (k *microserviceClient) Close() error {
 	var errStr []string
 	if k.stream != nil {
@@ -310,6 +328,7 @@ func (k *microserviceClient) Close() error {
 	return nil
 }
 
+// GetProcessNumber gets process number.
 func (k *microserviceClient) GetProcessNumber() int {
 	return k.env.MsNumber
 }

@@ -78,7 +78,7 @@ func (fa *FileAdapter) WatchKanban(ctx context.Context, msName string, msNumber 
 				if strings.Split(path.Base(kanbanPath), "_")[0] != convertStatusType(statusType) {
 					continue
 				}
-				kanban, err := fa.ReadKanban(msName, msNumber, statusType)
+				kanban, err := fa.readKanban(msName, msNumber, statusType)
 				if err != nil {
 					log.Printf("cant get kanban: %v", err)
 					continue
@@ -92,7 +92,7 @@ func (fa *FileAdapter) WatchKanban(ctx context.Context, msName string, msNumber 
 	return resCh, nil
 }
 
-func (fa *FileAdapter) ReadKanban(msName string, msNumber int, statusType StatusType) (*kanbanpb.StatusKanban, error) {
+func (fa *FileAdapter) readKanban(msName string, msNumber int, statusType StatusType) (*kanbanpb.StatusKanban, error) {
 	dataPath, err := fa.getPath(msName, msNumber, false)
 	if err != nil {
 		return nil, fmt.Errorf("cant read kanban, because directory does not exist: %s", dataPath)

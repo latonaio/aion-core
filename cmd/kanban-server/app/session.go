@@ -16,36 +16,36 @@ type Session struct {
 	microserviceName string
 	cacheKanban      *kanbanpb.StatusKanban
 	processNumber    int
-	ctx              context.Context
 	sendCh           chan *kanbanpb.Response
 	dataPath         string
 }
 
 // create microservice session
-func NewMicroserviceSessionWithRedis(ctx context.Context) *Session {
-	return newSession(ctx, kanban.NewRedisAdapter())
+func NewMicroserviceSessionWithRedis() *Session {
+	return newSession(kanban.NewRedisAdapter())
 }
 
 // create microservice session
-func NewMicroserviceSessionWithFile(ctx context.Context, dataPath string) *Session {
-	return newSession(ctx, kanban.NewFileAdapter(dataPath))
+func NewMicroserviceSessionWithFile(dataPath string) *Session {
+	return newSession(kanban.NewFileAdapter(dataPath))
 }
 
 // create struct of session with service broker
-func newSession(ctx context.Context, io kanban.Adapter) *Session {
+func newSession(io kanban.Adapter) *Session {
 	sendCh := make(chan *kanbanpb.Response)
 	return &Session{
 		io:               io, // kanban io ( redis or directory )
 		microserviceName: "",
 		cacheKanban:      nil,
 		processNumber:    0,
-		ctx:              ctx,
 		sendCh:           sendCh,
 	}
 }
 
 // start kanban watcher
-func (s *Session) StartKanbanWatcher(ctx context.Context) error {
+func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.InitializeService) error {
+	s.microserviceName = p.MicroserviceName
+	s.processNumber = int(p.ProcessNumber)
 	ch, err := s.io.WatchKanban(ctx, s.microserviceName, s.processNumber, kanban.StatusType_Before)
 	if err != nil {
 		return err
@@ -79,34 +79,9 @@ func (s *Session) StartKanbanWatcher(ctx context.Context) error {
 	return nil
 }
 
-// get cache kanban from json file
-func (s *Session) ReadKanban(p *kanbanpb.InitializeService, res *kanbanpb.Response) {
-	res.MessageType = kanbanpb.ResponseType_RES_CACHE_KANBAN
-	kanban, err := s.io.ReadKanban(p.MicroserviceName, int(p.ProcessNumber), kanban.StatusType_Before)
-	if err != nil {
-		res.Error = err.Error()
-		return
-	}
-	// create response message
-	resp, err := ptypes.MarshalAny(kanban)
-	if err != nil {
-		res.Error = err.Error()
-		return
-	}
-
-	// set response message
-	s.cacheKanban = kanban
-	s.cacheKanban.Services[len(s.cacheKanban.Services)-1].Name = s.microserviceName
-	s.microserviceName = p.MicroserviceName
-	s.processNumber = int(p.ProcessNumber)
-
-	// copy to protobuf by cache kanban
-	res.Message = resp
-	return
-}
-
 // set kanban from microservice
-func (s *Session) SetKanban(p *kanbanpb.InitializeService, res *kanbanpb.Response) {
+func (s *Session) SetKanban(p *kanbanpb.InitializeService) {
+	res := &kanbanpb.Response{}
 	res.MessageType = kanbanpb.ResponseType_RES_CACHE_KANBAN
 	// get cache kanban
 	s.cacheKanban = &kanbanpb.StatusKanban{
@@ -121,21 +96,24 @@ func (s *Session) SetKanban(p *kanbanpb.InitializeService, res *kanbanpb.Respons
 	s.microserviceName = p.MicroserviceName
 	s.processNumber = int(p.ProcessNumber)
 
-	resp, err := ptypes.MarshalAny(s.cacheKanban)
+	msg, err := ptypes.MarshalAny(s.cacheKanban)
 	if err != nil {
 		res.Error = err.Error()
+		s.sendCh <- res
 		return
 	}
-	res.Message = resp
-	return
+	res.Message = msg
+	s.sendCh <- res
 }
 
 // set next service yaml to output kanban
-func (s *Session) OutputKanban(p *kanbanpb.OutputRequest, res *kanbanpb.Response) {
+func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) {
+	res := &kanbanpb.Response{}
 	res.MessageType = kanbanpb.ResponseType_RES_REQUEST_RESULT
 	// check that already set microservice name
 	if s.microserviceName == "" {
 		res.Error = "input json is not read yet"
+		s.sendCh <- res
 		return
 	}
 
@@ -157,7 +135,8 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest, res *kanbanpb.Response
 	s.cacheKanban.StartAt = common.GetIsoDatetime()
 	if err := s.io.WriteKanban(s.microserviceName, s.processNumber, &afterKanban, kanban.StatusType_After); err != nil {
 		res.Error = fmt.Sprintf("cant write kanban: %v", err)
+		s.sendCh <- res
 		return
 	}
-	return
+	s.sendCh <- res
 }

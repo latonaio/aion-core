@@ -20,10 +20,10 @@ var (
 	cJsonSampleName     = "csample.json"
 )
 
-func TestFileAdapter_ReadKanban(t *testing.T) {
+func TestFileAdapter_readKanban(t *testing.T) {
 	fa := FileAdapter{aionDataPath: dataPath}
 	// normal case
-	kanban, err := fa.ReadKanban(priorServiceName, priorServiceNumber, StatusType_After)
+	kanban, err := fa.readKanban(priorServiceName, priorServiceNumber, StatusType_After)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestFileAdapter_ReadKanban(t *testing.T) {
 	}
 
 	// abnormal case: there is no file
-	kanban, err = fa.ReadKanban(nextServiceName, priorServiceNumber, StatusType_Before)
+	kanban, err = fa.readKanban(nextServiceName, priorServiceNumber, StatusType_Before)
 	if err == nil {
 		t.Errorf("there is no kanban, but can read file")
 	}

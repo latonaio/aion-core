@@ -59,26 +59,30 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	// but we should do this becase must close connection to don't overflow block xread connection.
 	if err := my_redis.GetInstance().CreatePool(srv.env.GetRedisAddr()); err != nil {
 		log.Printf("cant connect to redis, use directory mode: %v", err)
-		session = NewMicroserviceSessionWithFile(ctx, srv.env.GetAionHome())
+		session = NewMicroserviceSessionWithFile(srv.env.GetAionHome())
 		srv.isRedis = false
 	} else {
-		session = NewMicroserviceSessionWithRedis(ctx)
+		session = NewMicroserviceSessionWithRedis()
 	}
 
 	session.dataPath = srv.env.GetDataDir()
 
-	// create receive channel
-	recvCh := make(chan *kanbanpb.Request, 1)
+	// get message from client
+	// and then parse message type
 	go func() {
 		for {
-			// wait stream by client
 			in, err := stream.Recv()
 			if err != nil {
 				log.Printf("receive stream is closed: %v", err)
-				close(recvCh)
 				return
 			}
-			recvCh <- in
+			if err := srv.parseRequestMessage(ctx, session, in); err != nil {
+				res := &kanbanpb.Response{}
+				res.Error = err.Error()
+				if err := stream.Send(res); err != nil {
+					log.Printf("grpc send error: %v", err)
+				}
+			}
 		}
 	}()
 
@@ -96,65 +100,42 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 		}
 	}()
 
-loop:
-	// loop in receive ch and ctx Done
 	for {
 		select {
 		case <-ctx.Done():
-			break loop
-		case m, ok := <-recvCh:
-			if !ok {
-				break loop
-			}
-			// call message parser
-			go srv.parseRequestMessage(ctx, session, m)
+			log.Printf("connection closed")
+			return nil
 		}
 	}
-
-	// my_redis.GetInstance().Close()
-	return nil
 }
 
-func (srv *Server) parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) {
-	streamRes := &kanbanpb.Response{}
+func (srv *Server) parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) error {
 	switch m.MessageType {
 	case kanbanpb.RequestType_START_SERVICE:
-		// func1: notification of starting microservice and start to request kanban
 		p := &kanbanpb.InitializeService{}
 		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			streamRes.Error = fmt.Sprintf("failed unmarshal message in Get cache kanban request: %v", err)
-			break
+			return fmt.Errorf("failer unmarshal message in set next service request: %v", err)
 		}
-		session.ReadKanban(p, streamRes)
-		if err := session.StartKanbanWatcher(ctx); err != nil {
+		if err := session.StartKanbanWatcher(ctx, p); err != nil {
 			log.Printf("cant start kanban watcher: %v", err)
 		}
-
 	case kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN:
-		// func2: notification of starting first microservice.
-		// message include service name and process number
 		p := &kanbanpb.InitializeService{}
 		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			streamRes.Error = fmt.Sprintf("failed unmarshal message in set next service request: %v", err)
-			break
+			return fmt.Errorf("failer unmarshal message in set next service request: %v", err)
 		}
-		session.SetKanban(p, streamRes)
-		if err := session.StartKanbanWatcher(ctx); err != nil {
+		session.SetKanban(p)
+		if err := session.StartKanbanWatcher(ctx, p); err != nil {
 			log.Printf("cant start kanban watcher: %v", err)
 		}
 	case kanbanpb.RequestType_OUTPUT_AFTER_KANBAN:
-		// func3: request to output kanban to redis or directory from microservice
 		p := &kanbanpb.OutputRequest{}
 		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			streamRes.Error = fmt.Sprintf("failed unmarshal message in set next service request: %v", err)
-			break
+			return fmt.Errorf("failed unmarshal message in set next service request: %v", err)
 		}
-		session.OutputKanban(p, streamRes)
+		session.OutputKanban(p)
 	default:
-		// err function
-		streamRes.Error = fmt.Sprintf("message type is not defined: %s", m.MessageType)
-		log.Printf(streamRes.Error)
+		return fmt.Errorf("message type is not defined: %s", m.MessageType)
 	}
-	// sent response to client
-	session.sendCh <- streamRes
+	return nil
 }

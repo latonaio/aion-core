@@ -57,26 +57,6 @@ func unmarshalKanban(hash map[string]interface{}) (*kanbanpb.StatusKanban, error
 	return k, nil
 }
 
-func (a *RedisAdaptor) ReadKanban(msName string, msNumber int, statusType StatusType) (*kanbanpb.StatusKanban, error) {
-	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
-	hash, newID, err := my_redis.GetInstance().XReadOne([]string{streamKey}, []string{a.prevID}, 1, -1)
-	if err != nil {
-		return nil, fmt.Errorf("[read kanban] cant get by redis(key: %s): %v", streamKey, err)
-	}
-	a.prevID = newID
-	if statusType == StatusType_Before {
-		if err := my_redis.GetInstance().XDel(streamKey, []string{newID}); err != nil {
-			log.Printf("camt delete keys (streamKey: %s, id: %s)", streamKey, newID)
-		}
-	}
-	k, err := unmarshalKanban(hash)
-	if err != nil {
-		return nil, fmt.Errorf("[read kanban] %v (name: %s, number: %d)", err, msName, msNumber)
-	}
-	log.Printf("[read kanban] detect kanban (streamKey: %s)", streamKey)
-	return k, nil
-}
-
 func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb.StatusKanban, statusType StatusType) error {
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 
