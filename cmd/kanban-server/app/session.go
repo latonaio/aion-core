@@ -44,6 +44,7 @@ func newSession(io kanban.Adapter) *Session {
 
 // start kanban watcher
 func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.InitializeService) error {
+
 	s.microserviceName = p.MicroserviceName
 	s.processNumber = int(p.ProcessNumber)
 	ch, err := s.io.WatchKanban(ctx, s.microserviceName, s.processNumber, kanban.StatusType_Before)
@@ -58,8 +59,13 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 		for {
 			select {
 			case <-ctx.Done():
+				close(s.sendCh)
 				return
-			case kanban := <-ch:
+			case kanban, ok := <-ch:
+				if !ok {
+					close(s.sendCh)
+					return
+				}
 				anyMsg, err := ptypes.MarshalAny(kanban)
 				if err != nil {
 					log.Printf("[kanban Watcher] cant unmarchal status kanban to any message")
@@ -80,7 +86,7 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 }
 
 // set kanban from microservice
-func (s *Session) SetKanban(p *kanbanpb.InitializeService) {
+func (s *Session) SetKanban(p *kanbanpb.InitializeService) *kanbanpb.Response {
 	res := &kanbanpb.Response{}
 	res.MessageType = kanbanpb.ResponseType_RES_CACHE_KANBAN
 	// get cache kanban
@@ -99,22 +105,20 @@ func (s *Session) SetKanban(p *kanbanpb.InitializeService) {
 	msg, err := ptypes.MarshalAny(s.cacheKanban)
 	if err != nil {
 		res.Error = err.Error()
-		s.sendCh <- res
-		return
+		return res
 	}
 	res.Message = msg
-	s.sendCh <- res
+	return res
 }
 
 // set next service yaml to output kanban
-func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) {
+func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) *kanbanpb.Response {
 	res := &kanbanpb.Response{}
 	res.MessageType = kanbanpb.ResponseType_RES_REQUEST_RESULT
 	// check that already set microservice name
 	if s.microserviceName == "" {
 		res.Error = "input json is not read yet"
-		s.sendCh <- res
-		return
+		return res
 	}
 
 	nextServiceData := &kanbanpb.ServiceData{
@@ -135,8 +139,6 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) {
 	s.cacheKanban.StartAt = common.GetIsoDatetime()
 	if err := s.io.WriteKanban(s.microserviceName, s.processNumber, &afterKanban, kanban.StatusType_After); err != nil {
 		res.Error = fmt.Sprintf("cant write kanban: %v", err)
-		s.sendCh <- res
-		return
 	}
-	s.sendCh <- res
+	return res
 }

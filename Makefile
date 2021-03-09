@@ -24,10 +24,10 @@ go-cli-install: $(GO_SRCS)
 	go install ./cmd/aionctl
 
 go-build: $(GO_SRCS)
-	go build ./cmd/service-broker
-	go build ./cmd/kanban-server
-	go build ./cmd/send-anything
-	go build ./cmd/kanban-replicator
+	go build -o ./dst/service-broker ./cmd/service-broker
+	go build -o ./dst/kanban-server ./cmd/kanban-server
+	go build -o ./dst/send-anything ./cmd/send-anything
+	go build -o ./dst/kanban-replicator ./cmd/kanban-replicator
 
 go-install: $(GO_SRCS)
 	statik -src template -f

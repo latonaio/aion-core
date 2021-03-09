@@ -6,10 +6,12 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"bitbucket.org/latonaio/aion-core/pkg/common"
@@ -49,7 +51,23 @@ func (srv *Server) createServerConnection() error {
 	grpcServer := grpc.NewServer()
 	kanbanpb.RegisterSendAnythingServer(grpcServer, srv)
 	log.Printf("Start send anything server:%d", srv.env.GetServerPort())
-	return grpcServer.Serve(listen)
+
+	errCh := make(chan error)
+	go func() {
+		if err := grpcServer.Serve(listen); err != nil {
+			errCh <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, os.Interrupt)
+	select {
+	case err := <-errCh:
+		return err
+	case <-quit:
+		grpcServer.GracefulStop()
+		return nil
+	}
 }
 
 // callback that connect with service broker
@@ -57,19 +75,18 @@ func (srv *Server) ServiceBrokerConn(stream kanbanpb.SendAnything_ServiceBrokerC
 	ctx := stream.Context()
 	log.Printf("connect from servicebroker")
 
-	// create receive channel
-	recvCh := make(chan *kanbanpb.SendKanban, 1)
 	go func() {
 		for {
 			// wait stream by client
 			in, err := stream.Recv()
 			if err != nil {
 				log.Printf("receive stream is closed: %v", err)
-				close(recvCh)
 				return
 			}
 			log.Printf("[ServiceBrokerConn] receive from service broker")
-			recvCh <- in
+			if err := srv.sendToOtherDeviceClient(ctx, in); err != nil {
+				log.Printf("%v", err)
+			}
 		}
 	}()
 
@@ -85,22 +102,7 @@ func (srv *Server) ServiceBrokerConn(stream kanbanpb.SendAnything_ServiceBrokerC
 		}
 	}()
 
-	// loop in receive ch and ctx Done
-loop:
-	for {
-		select {
-		case <-ctx.Done():
-			break loop
-		case m, ok := <-recvCh:
-			if !ok {
-				break loop
-			}
-			// connect to send anything in other devices amd send data
-			if err := srv.sendToOtherDeviceClient(ctx, m); err != nil {
-				log.Printf("%v", err)
-			}
-		}
-	}
+	<-ctx.Done()
 	return nil
 }
 

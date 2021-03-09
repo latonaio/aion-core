@@ -51,7 +51,7 @@ func convertStatusType(statusType StatusType) string {
 	}
 }
 
-func (fa *FileAdapter) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (chan *kanbanpb.StatusKanban, error) {
+func (fa *FileAdapter) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (<-chan *kanbanpb.StatusKanban, error) {
 	dataPath, err := fa.getPath(msName, msNumber, true)
 	if err != nil {
 		return nil, fmt.Errorf("cant watch kanban, because directory does not exist: %s", dataPath)

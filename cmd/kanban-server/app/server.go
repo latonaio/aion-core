@@ -6,17 +6,22 @@ package app
 */
 
 import (
-	"bitbucket.org/latonaio/aion-core/pkg/log"
-	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
-	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
+
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-	"net"
-	"strconv"
-	"time"
+
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
+	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 )
 
 type Server struct {
@@ -46,7 +51,22 @@ func NewServer(env *Env) error {
 	kanbanpb.RegisterKanbanServer(grpcServer, server)
 	log.Printf("Start Status kanban server:%d", env.GetServerPort())
 
-	return grpcServer.Serve(listen)
+	errChan := make(chan error)
+	go func() {
+		if err := grpcServer.Serve(listen); err != nil {
+			errChan <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, os.Interrupt)
+	select {
+	case err := <-errChan:
+		return err
+	case <-quit:
+		grpcServer.GracefulStop()
+		return nil
+	}
 }
 
 // callback function when receive message from microservice
@@ -76,9 +96,11 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 				log.Printf("receive stream is closed: %v", err)
 				return
 			}
-			if err := srv.parseRequestMessage(ctx, session, in); err != nil {
-				res := &kanbanpb.Response{}
+			res, err := parseRequestMessage(ctx, session, in)
+			if err != nil {
 				res.Error = err.Error()
+			}
+			if res != nil {
 				if err := stream.Send(res); err != nil {
 					log.Printf("grpc send error: %v", err)
 				}
@@ -109,33 +131,40 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	}
 }
 
-func (srv *Server) parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) error {
+func parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, error) {
 	switch m.MessageType {
 	case kanbanpb.RequestType_START_SERVICE:
 		p := &kanbanpb.InitializeService{}
 		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return fmt.Errorf("failer unmarshal message in set next service request: %v", err)
+			return nil, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
 		}
 		if err := session.StartKanbanWatcher(ctx, p); err != nil {
 			log.Printf("cant start kanban watcher: %v", err)
+			return nil, err
 		}
+		return nil, nil
+
 	case kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN:
 		p := &kanbanpb.InitializeService{}
 		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return fmt.Errorf("failer unmarshal message in set next service request: %v", err)
+			return nil, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
 		}
-		session.SetKanban(p)
+		res := session.SetKanban(p)
 		if err := session.StartKanbanWatcher(ctx, p); err != nil {
 			log.Printf("cant start kanban watcher: %v", err)
+			return nil, err
 		}
+		return res, nil
+
 	case kanbanpb.RequestType_OUTPUT_AFTER_KANBAN:
 		p := &kanbanpb.OutputRequest{}
 		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return fmt.Errorf("failed unmarshal message in set next service request: %v", err)
+			return nil, fmt.Errorf("failed unmarshal message in set next service request: %v", err)
 		}
-		session.OutputKanban(p)
+		res := session.OutputKanban(p)
+		return res, nil
+
 	default:
-		return fmt.Errorf("message type is not defined: %s", m.MessageType)
+		return nil, fmt.Errorf("message type is not defined: %s", m.MessageType)
 	}
-	return nil
 }
