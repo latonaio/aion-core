@@ -17,6 +17,7 @@ message AionSetting {
     map<string, servicepb.Microservice> Microservices = 1;
     map<string, devicepb.Device> Devices = 2;
     string DeviceName = 3;
+    string Debug = 4;
 }
 
 enum ResponseCode {

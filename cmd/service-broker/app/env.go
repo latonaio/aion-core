@@ -19,6 +19,7 @@ type EnvironmentValue struct {
 	RepositoryPrefix string `envconfig:"REPOSITORY_PREFIX" default:"latonaio"`
 	Namespace        string `envconfig:"NAMESPACE" default:"default"`
 	RegistrySecret   string `envconfig:"REGISTRY_SECRET" default:"dockerhub"`
+	Debug            string `envconfig:"DEBUG" default:"false"`
 }
 
 type FlagValue struct {
@@ -42,6 +43,10 @@ func GetConfig() *Config {
 		log.Fatalf("AION_HOME does not exist : %s", conf.env.AionHome)
 	}
 	return &conf
+}
+
+func (e *Config) GetDebug() string {
+	return e.env.Debug
 }
 
 func (e *Config) GetConfigPath() string {

@@ -14,6 +14,7 @@ type ServiceConfigContainer interface {
 	GetMicroserviceByName(name string) (*Microservice, error)
 	GetNextServiceList(name string, connectionKey string) ([]*NextServiceSetting, error)
 	GetDeviceName() string
+	GetDebug() string
 	GetDeviceList() map[string]*Device
 }
 
@@ -122,6 +123,10 @@ func (ya *AionSetting) GetMicroserviceList() map[string]*Microservice {
 
 func (ya *AionSetting) GetDeviceName() string {
 	return ya.Aion.DeviceName
+}
+
+func (ya *AionSetting) GetDebug() string {
+	return ya.Aion.Debug
 }
 
 func (ya *AionSetting) GetDeviceList() map[string]*Device {

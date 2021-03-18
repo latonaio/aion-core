@@ -9,8 +9,9 @@ import (
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
+	"encoding/json"
 	"fmt"
-	"strconv"
+	"google.golang.org/protobuf/encoding/protojson"
 	"sync"
 )
 
@@ -111,26 +112,31 @@ func (w *Watcher) sendToNextService(k *kanbanpb.StatusKanban, serviceName string
 }
 
 func (w *Watcher) terminateServiceParser(k *kanbanpb.StatusKanban) (string, int, error) {
-	if funcName, ok := k.Metadata.Fields["type"]; !ok || funcName.String() != "terminate" {
+	m := k.GetMetadata()
+	var ret map[string]interface{}
+	b, err := protojson.Marshal(m)
+	if err != nil {
+		return "", 0, fmt.Errorf("Failed to marshal grpc stream")
+	}
+	if err := json.Unmarshal(b, &ret); err != nil {
+		return "", 0, fmt.Errorf("Failed to unmarshal json")
+	}
+
+	if funcName, ok := ret["type"].(string); !ok || funcName != "terminate" {
+		log.Printf("ok %v funcName.String() %s", ok, funcName)
 		return "", 0, fmt.Errorf("invalid function name (expect: terminate)")
 	}
 
-	serviceNameValue, ok := k.Metadata.Fields["name"]
+	serviceNameValue, ok := ret["name"].(string)
 	if !ok {
 		return "", 0, fmt.Errorf("not set service name")
 	}
-	serviceName := serviceNameValue.String()
 
-	numberValue, ok := k.Metadata.Fields["number"]
+	number, ok := ret["number"].(int)
 	if !ok {
-		return serviceName, -1, nil
-	} else {
-		number, err := strconv.Atoi(numberValue.String())
-		if err != nil {
-			return "", 0, fmt.Errorf("invalid number value :%s", numberValue)
-		}
-		return serviceName, number, nil
+		return serviceNameValue, -1, nil
 	}
+	return serviceNameValue, number, nil
 }
 
 func (w *Watcher) GetStartCh() chan *Container {

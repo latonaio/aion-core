@@ -32,6 +32,7 @@ func (msc *controller) setMicroserviceList() error {
 		// set aion path
 		msData.Env["AION_HOME"] = msc.aionHome
 		msData.Env["DEVICE_NAME"] = msc.aionSetting.GetDeviceName()
+		msData.Env["DEBUG"] = msc.aionSetting.GetDebug()
 
 		if err := msc.setMicroservice(msName, msData); err != nil {
 			errList = append(errList, err.Error())

@@ -15,6 +15,7 @@ type YamlAionSetting struct {
 	Microservices map[string]*YamlMicroservice `yaml:""`
 	Devices       map[string]*YamlDevice       `yaml:",omitempty"`
 	DeviceName    string                       `yaml:"deviceName,omitempty"`
+	Debug         string                       `yaml:"debug,omitempty"`
 }
 
 type YamlDevice struct {
@@ -140,5 +141,6 @@ func (as *YamlAionSetting) mapToGRPCAionSetting() *projectpb.AionSetting {
 		}
 	}
 	grpcAionSetting.DeviceName = as.DeviceName
+	grpcAionSetting.Debug = as.Debug
 	return grpcAionSetting
 }
