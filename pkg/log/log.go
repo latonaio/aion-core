@@ -21,6 +21,10 @@ type Logger interface {
 	Println(v ...interface{})
 	Debugf(format string, v ...interface{})
 	Debugln(v ...interface{})
+	Warnf(format string, v ...interface{})
+	Warnln(v ...interface{})
+	Errorf(format string, v ...interface{})
+	Errorln(v ...interface{})
 	Fatal(v ...interface{})
 	Fatalf(format string, v ...interface{})
 }
@@ -79,17 +83,14 @@ func (l *logger) SetFormat(processName string) {
 	log.SetFlags(log.Ldate | log.Lmicroseconds)
 }
 
-// Printf writes a formatted message to the log.
 func Printf(format string, v ...interface{}) {
 	defaultLogger.Printf("INFO", format, v...)
 }
 
-// Print writes a message to the log.
 func Print(v ...interface{}) {
 	defaultLogger.Print("INFO", v...)
 }
 
-// Println writes a line to the log.
 func Println(v ...interface{}) {
 	defaultLogger.Println("INFO", v...)
 }
@@ -106,12 +107,26 @@ func Debugln(v ...interface{}) {
 	}
 }
 
-// Fatal writes a message to the log and aborts.
+func Warnf(format string, v ...interface{}) {
+	defaultLogger.Printf("WARN", format, v...)
+}
+
+func Warnln(v ...interface{}) {
+	defaultLogger.Println("WARN", v...)
+}
+
+func Errorf(format string, v ...interface{}) {
+	defaultLogger.Printf("ERROR", format, v...)
+}
+
+func Errorln(v ...interface{}) {
+	defaultLogger.Println("ERROR", v...)
+}
+
 func Fatal(v ...interface{}) {
 	defaultLogger.Fatal("FATAL", v...)
 }
 
-// Fatalf writes a formatted message to the log and aborts.
 func Fatalf(format string, v ...interface{}) {
 	defaultLogger.Fatalf("FATAL", format, v...)
 }

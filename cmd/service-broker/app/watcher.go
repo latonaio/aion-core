@@ -37,17 +37,23 @@ func NewWatcher(dc *devices.Controller, io kanban.Adapter) *Watcher {
 	}
 }
 
-func (w *Watcher) WatchReceiveKanban(aionCh <-chan *config.AionSetting) {
+func (w *Watcher) WatchReceiveKanban(ctx context.Context, aionCh <-chan *config.AionSetting) {
 	deviceCh := w.deviceController.GetReceiveKanbanCh()
 	for {
 		select {
+		case <-ctx.Done():
+			log.Printf("[watcher] stop watch receive kanban")
+			return
 		case as := <-aionCh:
 			w.Lock()
 			w.aionSetting = as
 			w.Unlock()
-		case k := <-deviceCh:
+		case k, ok := <-deviceCh:
+			if !ok {
+				return
+			}
 			if err := w.sendToNextService(k.AfterKanban, k.NextService, int(k.NextNumber)); err != nil {
-				log.Print(err)
+				log.Errorln(err)
 			}
 		}
 	}
@@ -58,7 +64,7 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 	defer cancel()
 	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, kanban.StatusType_After)
 	if err != nil {
-		log.Printf("cannot start watch microservice (name:%s, num:%d)", msName, msNumber)
+		log.Errorf("[watcher] cannot start watch microservice (name:%s, num:%d)", msName, msNumber)
 		return
 	}
 
@@ -68,10 +74,14 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 		case <-ctx.Done():
 			log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
 			return
-		case k := <-kanbanCh:
+		case k, ok := <-kanbanCh:
+			if !ok {
+				log.Warnf("[watcher] watch kanban closed")
+				return
+			}
 			nextServiceList, err := w.aionSetting.GetNextServiceList(msName, k.ConnectionKey)
 			if err != nil {
-				log.Printf("[watcher] %v, skipped", err)
+				log.Warnf("[watcher] %v, skipped", err)
 				continue
 			}
 			for _, nextService := range nextServiceList {
@@ -87,7 +97,7 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 					// send to local microservice
 					k.Services[len(k.Services)-1].Device = w.aionSetting.GetDeviceName()
 					if err := w.sendToNextService(k, nextService.NextServiceName, number); err != nil {
-						log.Print(err)
+						log.Errorln(err)
 					}
 				}
 			}

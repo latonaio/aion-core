@@ -18,7 +18,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	log.SetFormat("service-broker")
 	env := app.GetConfig()
 
@@ -50,20 +51,16 @@ func main() {
 	s := grpc.NewServer()
 	server := &services.ProjectServer{AionCh: aionCh, IsDocker: env.IsDocker()}
 	pb.RegisterProjectServer(s, server)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("cant start server")
-	}
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("cant start server")
+		}
+	}()
 
 	signalCh := make(chan os.Signal)
 	signal.Notify(signalCh, syscall.SIGTERM)
 
-	for {
-		select {
-		case s := <-signalCh:
-			log.Printf("recieved signal: %s", s.String())
-			msc.StopAllMicroservice()
-			goto END
-		}
-	}
-END:
+	<-signalCh
+	log.Printf("recieved signal: ")
+	msc.StopAllMicroservice()
 }

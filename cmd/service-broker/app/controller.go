@@ -56,11 +56,6 @@ func (msc *controller) setMicroservice(msName string, msData *config.Microservic
 func (msc *controller) startStartupMicroservice(ctx context.Context) error {
 	msList := msc.aionSetting.GetMicroserviceList()
 	var errList []string
-	if len(errList) != 0 {
-		errStr := strings.Join(errList, "\n")
-		return fmt.Errorf(
-			"detect invalid microservice configuration: \n%s", errStr)
-	}
 
 	for msName, msData := range msList {
 		// TODO :insert periodic executiopn
@@ -73,8 +68,7 @@ func (msc *controller) startStartupMicroservice(ctx context.Context) error {
 
 	if len(errList) != 0 {
 		errStr := strings.Join(errList, "\n")
-		return fmt.Errorf(
-			"cant startup microservice: \n%s", errStr)
+		return fmt.Errorf("cant startup microservice: \n%s", errStr)
 	}
 
 	return nil
@@ -87,22 +81,23 @@ func (msc *controller) startMicroservice(ctx context.Context, name string) error
 	}
 	for i := 1; i <= ms.GetScale(); i++ {
 		if err := ms.StartMicroservice(i); err != nil {
-			log.Printf("cannot start microservice (name:%s, num:%d)", name, i)
+			log.Warnf("cannot start microservice (name:%s, num:%d)", name, i)
+		} else {
+			go msc.watcher.WatchMicroservice(ctx, name, i)
+			log.Printf("start microservice: (name:%s, num:%d)", name, i)
 		}
-		go msc.watcher.WatchMicroservice(ctx, name, i)
 	}
-	log.Printf("start microservice: %s", name)
 	return nil
 }
 
 func (msc *controller) startMicroserviceByNum(ctx context.Context, name string, mNum int) error {
 	ms, ok := msc.microserviceList[name]
 	if !ok {
-		log.Printf("there is no microservice: %s", name)
+		log.Errorf("there is no microservice: %s", name)
 		return fmt.Errorf("there is no microservice: %s", name)
 	}
 	if err := ms.StartMicroservice(mNum); err != nil {
-		log.Printf("failed to start microservice: (name:%s, num:%d", name, mNum)
+		log.Errorf("failed to start microservice: (name:%s, num:%d", name, mNum)
 		return err
 	}
 	go msc.watcher.WatchMicroservice(ctx, name, mNum)
@@ -125,7 +120,8 @@ func (msc *controller) stopMicroservice(name string) error {
 	}
 	for i := 1; i <= ms.GetScale(); i++ {
 		if err := ms.StopMicroservice(i); err != nil {
-			log.Printf("cannot stop microservice (name:%s, num:%d)", name, i)
+			log.Debugf("%v", err)
+			log.Warnf("cannot stop microservice (name:%s, num:%d)", name, i)
 		}
 	}
 	log.Printf("stop all microservice from watcher (name:%s)", name)
@@ -152,6 +148,10 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 	for {
 		select {
 		case <-ctx.Done():
+			if cancel != nil {
+				cancel()
+			}
+			log.Printf("stop watch kanban for microservice")
 			return
 		case as := <-aionCh:
 			if cancel != nil {
@@ -189,13 +189,13 @@ func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-cha
 
 	var adapter kanban.Adapter
 	if err := my_redis.GetInstance().CreatePool(env.GetRedisAddr()); err != nil {
-		log.Printf("cant connect to redis, use directory mode: %v", err)
+		log.Warnf("cant connect to redis, use directory mode: %v", err)
 		adapter = kanban.NewFileAdapter(env.GetDataDir())
 	} else {
 		log.Printf("Use redis mode")
 		adapter = kanban.NewRedisAdapter()
 		if err := my_redis.GetInstance().FlushAll(); err != nil {
-			log.Printf("cant initialized redis: %v", err)
+			log.Errorf("cant initialized redis: %v", err)
 		}
 	}
 
@@ -210,7 +210,7 @@ func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-cha
 	msc.watcher = NewWatcher(dc, adapter)
 
 	// watch receive channel from send anything server
-	go msc.watcher.WatchReceiveKanban(aionChForWatcher)
+	go msc.watcher.WatchReceiveKanban(ctx, aionChForWatcher)
 	// wait to start microservice by watcher
 	go msc.WatchKanbanForMicroservice(ctx, aionCh, aionChForWatcher)
 	return msc, nil
