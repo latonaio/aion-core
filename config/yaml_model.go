@@ -4,11 +4,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	"gopkg.in/yaml.v2"
-
 	"bitbucket.org/latonaio/aion-core/proto/devicepb"
 	"bitbucket.org/latonaio/aion-core/proto/projectpb"
 	"bitbucket.org/latonaio/aion-core/proto/servicepb"
+	"gopkg.in/yaml.v2"
 )
 
 type YamlAionSetting struct {

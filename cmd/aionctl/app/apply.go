@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/internal/services"
 
@@ -15,6 +17,8 @@ func applyCmd() *cobra.Command {
 		Short: "apply project file",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			hostName := fmt.Sprintf("%s:%s", HostName, PortNumber)
+			fmt.Printf("aion-master:%v\n", hostName)
 			if len(args) == 0 {
 				return nil
 			}
@@ -22,11 +26,9 @@ func applyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := services.Apply("localhost:30644", aion); err != nil {
-				fmt.Printf("failed to send project.yaml to service-broker")
-			}
-			if err := services.Apply("localhost:30655", aion); err != nil {
-				fmt.Printf("failed to send project.yaml to service-broker")
+			log.Debugf("aionctl apply : %+v \n", aion)
+			if err := services.Apply(hostName, aion); err != nil {
+				fmt.Printf("failed to send project.yaml to service-broker cause: %v \n", err)
 			}
 			return nil
 		},

@@ -1,8 +1,9 @@
 package kanban
 
 import (
-	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
+
+	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 )
 
 // watcher and writer adapter

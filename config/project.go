@@ -174,9 +174,7 @@ func (ya *AionSetting) setInitializeValue(isDocker bool) error {
 		if msData.Tag == "" {
 			msData.Tag = DefaultTag
 		}
-		if isDocker {
-			msData.Docker = !msData.Docker
-		}
+		msData.Docker = isDocker
 
 		for _, nextKey := range msData.NextService {
 			for _, nextMs := range nextKey.NextServiceSetting {

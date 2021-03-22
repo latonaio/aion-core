@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package clusterpb;
+option go_package = "bitbucket.org/latonaio/aion-core/proto/clusterpb";
+
+import "projectpb/project.proto";
+
+service Cluster {
+  // master-aionのclusterへのjoin
+  rpc JoinMasterAion(stream NodeMeta) returns (stream Apply);
+}
+
+message NodeMeta {
+  string nodeName =1;
+  string nodeIP = 2;
+  map<string,bool> servicesStatus= 3;
+}
+
+message Apply {
+  projectpb.AionSetting AionSetting =1;
+}

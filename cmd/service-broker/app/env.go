@@ -1,11 +1,12 @@
 package app
 
 import (
-	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"flag"
-	"github.com/kelseyhightower/envconfig"
 	"os"
 	"path"
+
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type Config struct {
@@ -13,12 +14,23 @@ type Config struct {
 	flag FlagValue
 }
 
+type Mode string
+
+const (
+	DefaultMode Mode = "default"
+	MasterMode  Mode = "master"
+	WorkerMode  Mode = "worker"
+)
+
 type EnvironmentValue struct {
 	AionHome         string `envconfig:"AION_HOME" default:"/var/lib/aion"`
 	RedisAddr        string `envconfig:"REDIS_HOST" default:"localhost:6379"`
 	RepositoryPrefix string `envconfig:"REPOSITORY_PREFIX" default:"latonaio"`
 	Namespace        string `envconfig:"NAMESPACE" default:"default"`
 	RegistrySecret   string `envconfig:"REGISTRY_SECRET" default:"dockerhub"`
+	Mode             Mode   `envconfig:"MODE" default:"default"`
+	NodeName         string `envconfig:"NODE_NAME" default:"localhost"`
+	NodeIP           string `envconfig:"NODE_IP" default:"127.0.0.1"`
 	Debug            string `envconfig:"DEBUG" default:"false"`
 }
 
@@ -79,4 +91,40 @@ func (e *Config) GetRegistrySecret() string {
 
 func (e *Config) IsDocker() bool {
 	return *e.flag.IsDocker
+}
+
+func (e *Config) GetMode() Mode {
+	log.Printf("AION-MODE=%v", e.env.Mode)
+	switch e.env.Mode {
+	case DefaultMode, MasterMode, WorkerMode:
+		return e.env.Mode
+	default:
+		return DefaultMode
+	}
+}
+
+func (e *Config) IsDefaultMode() bool {
+	switch e.env.Mode {
+	case MasterMode, WorkerMode:
+		return false
+	default:
+		return true
+	}
+}
+
+func (e *Config) IsWorkerMode() bool {
+	switch e.env.Mode {
+	case WorkerMode:
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *Config) GetNodeName() string {
+	return e.env.NodeName
+}
+
+func (e *Config) GetNodeIP() string {
+	return e.env.NodeIP
 }

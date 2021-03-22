@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package servicepb;
+option go_package = "bitbucket.org/latonaio/aion-core/proto/servicepb";
 
 message Microservice {
 

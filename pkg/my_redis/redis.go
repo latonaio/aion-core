@@ -18,8 +18,7 @@ const (
 )
 
 type RedisClient struct {
-	address string
-	client  *redis.Client
+	client *redis.Client
 }
 
 func GetInstance() *RedisClient {
@@ -110,4 +109,17 @@ func (rc *RedisClient) FlushAll() error {
 func (rc *RedisClient) XDel(streamKey string, ids []string) error {
 	_, err := rc.client.XDel(streamKey, ids...).Result()
 	return err
+}
+
+func (rc *RedisClient) HGet(key string) (map[string]string, error) {
+	return rc.client.HGetAll(key).Result()
+}
+
+func (rc *RedisClient) HSet(key string, value map[string]interface{}) (int64, error) {
+	count, err := rc.client.HSet(key, value).Result()
+	return count, err
+}
+
+func (rc *RedisClient) Delete(keys ...string) (int64, error) {
+	return rc.client.Del(keys...).Result()
 }

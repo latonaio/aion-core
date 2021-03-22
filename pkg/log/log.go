@@ -105,6 +105,7 @@ func Debugln(v ...interface{}) {
 	if debug.Debug == "true" {
 		defaultLogger.Println("DEBUG", v...)
 	}
+
 }
 
 func Warnf(format string, v ...interface{}) {

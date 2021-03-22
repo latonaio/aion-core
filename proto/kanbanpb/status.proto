@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package kanbanpb;
-
+option go_package = "bitbucket.org/latonaio/aion-core/proto/kanbanpb";
 import "google/protobuf/struct.proto";
 import "google/protobuf/any.proto";
 

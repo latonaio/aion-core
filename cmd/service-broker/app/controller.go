@@ -2,27 +2,31 @@
 package app
 
 import (
+	"context"
+	"fmt"
+	"strings"
+	"sync"
+
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/internal/devices"
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/internal/microservice"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
-	"context"
-	"fmt"
-	"strings"
-	"sync"
 )
 
 const defaultPort = 11001
 
 type controller struct {
 	sync.Mutex
-	aionHome         string
-	microserviceList map[string]*microservice.ScaleContainer
-	deviceController *devices.Controller
-	watcher          *Watcher
-	aionSetting      *config.AionSetting
+	aionHome            string
+	microserviceList    map[string]*microservice.ScaleContainer
+	deviceController    *devices.Controller
+	watcher             *Watcher
+	aionSetting         *config.AionSetting
+	microservicesStatus map[string]bool
+	updateTrigger       chan map[string]bool
+	config              *Config
 }
 
 func (msc *controller) setMicroserviceList() error {
@@ -38,6 +42,15 @@ func (msc *controller) setMicroserviceList() error {
 			errList = append(errList, err.Error())
 			continue
 		}
+
+		// workerの場合のみ状態を更新
+		if msc.config.IsWorkerMode() {
+			msc.SetServiceStatusDeactivate(msName)
+		}
+	}
+	log.Debugf("set　microservice counter: %v", len(msc.microserviceList))
+	if len(errList) != 0 {
+		log.Printf("set setMicroservice failed cause: %+v \n", errList)
 	}
 	return nil
 }
@@ -48,8 +61,9 @@ func (msc *controller) setMicroservice(msName string, msData *config.Microservic
 		return err
 	}
 	msc.Lock()
-	defer msc.Unlock()
 	msc.microserviceList[msName] = sc
+	msc.Unlock()
+	log.Debugf("setMicroservice %v:", msName)
 	return nil
 }
 
@@ -60,8 +74,15 @@ func (msc *controller) startStartupMicroservice(ctx context.Context) error {
 	for msName, msData := range msList {
 		// TODO :insert periodic executiopn
 		if msData.Startup {
-			if err := msc.startMicroservice(ctx, msName); err != nil {
+			err := msc.startMicroservice(ctx, msName)
+			if err != nil {
 				errList = append(errList, err.Error())
+				// skip
+				continue
+			}
+			// workerの時のみ 状態更新
+			if msc.config.IsWorkerMode() {
+				msc.SetServiceStatusActive(msName)
 			}
 		}
 	}
@@ -70,7 +91,7 @@ func (msc *controller) startStartupMicroservice(ctx context.Context) error {
 		errStr := strings.Join(errList, "\n")
 		return fmt.Errorf("cant startup microservice: \n%s", errStr)
 	}
-
+	log.Debugf("start upped service count: %v", len(msList))
 	return nil
 }
 
@@ -79,14 +100,17 @@ func (msc *controller) startMicroservice(ctx context.Context, name string) error
 	if !ok {
 		return fmt.Errorf("there is no microservice: %s", name)
 	}
+
 	for i := 1; i <= ms.GetScale(); i++ {
 		if err := ms.StartMicroservice(i); err != nil {
-			log.Warnf("cannot start microservice (name:%s, num:%d)", name, i)
+			log.Errorf("cannot start microservice (name:%s, num:%d)", name, i)
 		} else {
 			go msc.watcher.WatchMicroservice(ctx, name, i)
 			log.Printf("start microservice: (name:%s, num:%d)", name, i)
 		}
 	}
+	log.Printf("start microservice: %s", name)
+
 	return nil
 }
 
@@ -100,6 +124,11 @@ func (msc *controller) startMicroserviceByNum(ctx context.Context, name string, 
 		log.Errorf("failed to start microservice: (name:%s, num:%d", name, mNum)
 		return err
 	}
+	// set deploy status active
+	if msc.config.IsWorkerMode() {
+		msc.SetServiceStatusActive(name)
+	}
+
 	go msc.watcher.WatchMicroservice(ctx, name, mNum)
 	log.Printf("start microservice from watcher (name:%s, num:%d)", name, mNum)
 	return nil
@@ -108,7 +137,7 @@ func (msc *controller) startMicroserviceByNum(ctx context.Context, name string, 
 func (msc *controller) StopAllMicroservice() {
 	for name, _ := range msc.microserviceList {
 		if err := msc.stopMicroservice(name); err != nil {
-			fmt.Errorf("there is no microservice: %s", name)
+			log.Warnf("there is no microservice: %s", name)
 		}
 	}
 }
@@ -125,6 +154,11 @@ func (msc *controller) stopMicroservice(name string) error {
 		}
 	}
 	log.Printf("stop all microservice from watcher (name:%s)", name)
+	// deploy status
+	if msc.config.IsWorkerMode() {
+		msc.SetServiceStatusDeactivate(name)
+	}
+
 	return nil
 }
 
@@ -136,6 +170,9 @@ func (msc *controller) stopMicroserviceByNum(name string, mNum int) error {
 	if err := ms.StopMicroservice(mNum); err != nil {
 		return err
 	}
+	if msc.config.IsWorkerMode() {
+		msc.SetServiceStatusDeactivate(name)
+	}
 	log.Printf("stop microservice from watcher (name:%s, num:%d)", name, mNum)
 	return nil
 }
@@ -145,6 +182,7 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 	var childCtx context.Context
 	startCh := msc.watcher.GetStartCh()
 	stopCh := msc.watcher.GetStopCh()
+	log.Println("WatchKanbanForMicroservice watching aionCh")
 	for {
 		select {
 		case <-ctx.Done():
@@ -164,29 +202,35 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 			msc.StopAllMicroservice()
 			msc.aionSetting = as
 			msc.Unlock()
+			log.Debugf("[worker] deploy start with %+v", as)
 			aionChForWatcher <- as
 			if err := msc.setMicroserviceList(); err != nil {
-				log.Printf("%v", err)
+				log.Errorf("setMicroserviceList failed cause: %v \n", err)
 			}
-			msc.startStartupMicroservice(childCtx)
+			log.Debugf("setMicroserviceList done")
+			if err := msc.startStartupMicroservice(childCtx); err != nil {
+				log.Errorf("startStartupMicroservice failed cause: %v \n", err)
+			}
 		case ms := <-startCh:
-			msc.startMicroserviceByNum(childCtx, ms.Name, ms.Number)
+			if err := msc.startMicroserviceByNum(childCtx, ms.Name, ms.Number); err != nil {
+				log.Errorf("startMicroserviceByNum failed cause: %v \n", err)
+			}
 		case ms := <-stopCh:
 			if ms.Number == -1 {
-				msc.stopMicroservice(ms.Name)
+				if err := msc.stopMicroservice(ms.Name); err != nil {
+					log.Errorf("stopMicroservice failed cause: %v \n", err)
+				}
 			} else {
-				msc.stopMicroserviceByNum(ms.Name, ms.Number)
+				if err := msc.stopMicroserviceByNum(ms.Name, ms.Number); err != nil {
+					log.Errorf("stopMicroserviceByNum failed cause: %v \n", err)
+				}
 			}
 		}
 	}
 }
 
 func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-chan *config.AionSetting) (*controller, error) {
-	dc, err := devices.NewDeviceController(ctx, env.IsDocker())
-	if err != nil {
-		return nil, err
-	}
-
+	// kanban use redis or file
 	var adapter kanban.Adapter
 	if err := my_redis.GetInstance().CreatePool(env.GetRedisAddr()); err != nil {
 		log.Warnf("cant connect to redis, use directory mode: %v", err)
@@ -199,19 +243,53 @@ func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-cha
 		}
 	}
 
+	dc, err := devices.NewDeviceController(ctx, env.IsDocker())
+	if err != nil {
+		return nil, err
+	}
 	// start to watch result about previous microservice
 	msc := &controller{
-		aionHome:         env.GetAionHome(),
-		microserviceList: make(map[string]*microservice.ScaleContainer),
-		deviceController: dc,
+		aionHome:            env.GetAionHome(),
+		microserviceList:    make(map[string]*microservice.ScaleContainer),
+		deviceController:    dc,
+		microservicesStatus: make(map[string]bool),
+		watcher:             NewWatcher(dc, adapter),
+		updateTrigger:       make(chan map[string]bool, 1),
+		config:              env,
 	}
 
 	aionChForWatcher := make(chan *config.AionSetting)
-	msc.watcher = NewWatcher(dc, adapter)
 
 	// watch receive channel from send anything server
 	go msc.watcher.WatchReceiveKanban(ctx, aionChForWatcher)
 	// wait to start microservice by watcher
 	go msc.WatchKanbanForMicroservice(ctx, aionCh, aionChForWatcher)
 	return msc, nil
+}
+
+func (msc *controller) GetMicroServicesStatus() map[string]bool {
+	return msc.microservicesStatus
+}
+
+func (msc *controller) SetServiceStatusActive(serviceName string) {
+	msc.Lock()
+	msc.microservicesStatus[serviceName] = true
+	msc.sendUpdateStatusTrigger(msc.microservicesStatus)
+	msc.Unlock()
+
+}
+func (msc *controller) SetServiceStatusDeactivate(serviceName string) {
+
+	msc.Lock()
+	msc.microservicesStatus[serviceName] = false
+	msc.Unlock()
+	msc.sendUpdateStatusTrigger(msc.microservicesStatus)
+}
+
+func (msc *controller) sendUpdateStatusTrigger(updated map[string]bool) {
+	msc.updateTrigger <- updated
+}
+
+func (msc *controller) GetStatusUpdateTrigger() <-chan map[string]bool {
+	return msc.updateTrigger
 }

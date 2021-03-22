@@ -1,12 +1,13 @@
 package app
 
 import (
+	"context"
+	"fmt"
+
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/common"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
-	"context"
-	"fmt"
 	"github.com/golang/protobuf/ptypes"
 	_struct "github.com/golang/protobuf/ptypes/struct"
 )
@@ -126,7 +127,7 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) *kanbanpb.Response {
 		Device: p.DeviceName,
 	}
 	// set metadata to after kanban
-	afterKanban := *s.cacheKanban
+	afterKanban := s.cacheKanban
 	afterKanban.FinishAt = common.GetIsoDatetime()
 	afterKanban.PriorSuccess = p.PriorSuccess
 	afterKanban.FileList = p.FileList
@@ -137,7 +138,7 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) *kanbanpb.Response {
 
 	// write after kanban
 	s.cacheKanban.StartAt = common.GetIsoDatetime()
-	if err := s.io.WriteKanban(s.microserviceName, s.processNumber, &afterKanban, kanban.StatusType_After); err != nil {
+	if err := s.io.WriteKanban(s.microserviceName, s.processNumber, afterKanban, kanban.StatusType_After); err != nil {
 		res.Error = fmt.Sprintf("cant write kanban: %v", err)
 	}
 	return res

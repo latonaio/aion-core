@@ -1,14 +1,15 @@
 syntax =  "proto3";
 
 package projectpb;
+option go_package = "bitbucket.org/latonaio/aion-core/proto/projectpb";
 
-import "bitbucket.org/latonaio/aion-core/proto/servicepb/service.proto";
-import "bitbucket.org/latonaio/aion-core/proto/devicepb/device.proto";
+import "servicepb/service.proto";
+import "devicepb/device.proto";
 
 service Project {
    rpc Apply (AionSetting) returns (Response) {}
    rpc Delete (AionSetting) returns (Response) {}
-   rpc Get (Empty) returns (stream AionSetting) {}
+   rpc Status (Empty) returns (Services) {}
 }
 
 message Empty {}
@@ -29,4 +30,9 @@ enum ResponseCode {
 message Response {
     string Message = 1;
     ResponseCode Code = 2;
+}
+
+message Services {
+  Response response = 1;
+  map<string,string> Status =2 ;
 }

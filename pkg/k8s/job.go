@@ -28,7 +28,7 @@ func NewJob(
 	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Job {
 
 	return &Job{
-		name:        k8s.getLabelName(serviceName, number, targetNode),
+		name:        k8s.getLabelName(serviceName, number),
 		serviceName: serviceName,
 		job:         k8s.client.BatchV1().Jobs(k8s.namespace),
 		k8s:         k8s,

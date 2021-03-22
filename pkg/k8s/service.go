@@ -26,7 +26,7 @@ type Service struct {
 func NewService(serviceName string, number int, ports []*config.PortConfig, network string, k8s *k8sResource) *Service {
 	return &Service{
 		serviceName: serviceName,
-		name:        fmt.Sprintf("%s-srv", k8s.getLabelName(serviceName, number, "")),
+		name:        fmt.Sprintf("%s-srv", k8s.getLabelName(serviceName, number)),
 		service:     k8s.client.CoreV1().Services(k8s.namespace),
 		number:      number,
 		ports:       ports,
@@ -90,7 +90,7 @@ func (s *Service) config() *apiV1.Service {
 }
 
 func (s *Service) getLabelName(serviceName string, number int) string {
-	return fmt.Sprintf("%s-srv", s.k8s.getLabelName(serviceName, number, ""))
+	return fmt.Sprintf("%s-srv", s.k8s.getLabelName(serviceName, number))
 }
 
 func (s *Service) getPortConfigList() []apiV1.ServicePort {

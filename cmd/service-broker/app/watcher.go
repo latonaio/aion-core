@@ -3,16 +3,17 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
+
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/internal/devices"
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
-	"context"
-	"encoding/json"
-	"fmt"
 	"google.golang.org/protobuf/encoding/protojson"
-	"sync"
 )
 
 const (
@@ -22,8 +23,9 @@ const (
 type Watcher struct {
 	sync.Mutex
 	kanban.Adapter
-	startCh          chan *Container
-	stopCh           chan *Container
+	startCh chan *Container
+	stopCh  chan *Container
+	// send anything grpc server
 	deviceController *devices.Controller
 	aionSetting      *config.AionSetting
 }

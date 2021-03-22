@@ -6,6 +6,7 @@ import (
 
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	pb "bitbucket.org/latonaio/aion-core/proto/projectpb"
 )
 
@@ -17,10 +18,10 @@ type ProjectServer struct {
 	prj      *pb.AionSetting
 }
 
-func (p *ProjectServer) Apply(ctx context.Context, prj *pb.AionSetting) (*pb.Response, error) {
-	log.Printf("received aionSetting")
+func (p *ProjectServer) Apply(ctx context.Context, receivedAionSetting *pb.AionSetting) (*pb.Response, error) {
+	log.Debugf("[grpc][server][received] AionSetting: %+v", receivedAionSetting)
 	p.Lock()
-	p.prj = prj
+	p.prj = receivedAionSetting
 	p.Unlock()
 	aionSetting, err := config.LoadConfigFromGRPC(p.prj, p.IsDocker)
 	if err != nil {
@@ -29,8 +30,9 @@ func (p *ProjectServer) Apply(ctx context.Context, prj *pb.AionSetting) (*pb.Res
 			Code:    pb.ResponseCode_Failed,
 		}, nil
 	}
+
 	p.AionCh <- aionSetting
-	p.prj = prj
+	p.prj = receivedAionSetting
 
 	return &pb.Response{
 		Message: "Success",
@@ -60,5 +62,32 @@ func (p *ProjectServer) Delete(ctx context.Context, prj *pb.AionSetting) (*pb.Re
 	return &pb.Response{
 		Message: "Success",
 		Code:    pb.ResponseCode_OK,
+	}, nil
+}
+
+func (p *ProjectServer) Status(context.Context, *pb.Empty) (*pb.Services, error) {
+	rdsCon := my_redis.GetInstance()
+	result, err := rdsCon.HGet("aion-cluster-status")
+	if err != nil {
+		log.Printf("[WorkerMonitor][GetAllServicesStatus] failed cause: %v", err)
+		return &pb.Services{
+			Response: &pb.Response{
+				Message: err.Error(),
+				Code:    pb.ResponseCode_Failed,
+			},
+			Status: nil,
+		}, err
+	}
+
+	if len(result) == 0 {
+		result = map[string]string{}
+	}
+
+	return &pb.Services{
+		Response: &pb.Response{
+			Message: "",
+			Code:    pb.ResponseCode_Failed,
+		},
+		Status: result,
 	}, nil
 }

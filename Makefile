@@ -62,10 +62,14 @@ python-proto: proto
 	rm $(PY_PROTO_DIR)/*.proto
 
 go-proto: proto
-	protoc --go_out=plugins=grpc:. ./proto/kanbanpb/status.proto
-	protoc --go_out=plugins=grpc:. ./proto/devicepb/device.proto
-	protoc --go_out=plugins=grpc:. ./proto/servicepb/service.proto
-	protoc -I${GOPATH}/src -I./proto/projectpb --go_out=plugins=grpc:./proto/projectpb ./proto/projectpb/project.proto
+	protoc --go_out=plugins=grpc,paths=source_relative:./ ./proto/kanbanpb/status.proto
+	protoc --go_out=plugins=grpc,paths=source_relative:./ ./proto/devicepb/device.proto
+	protoc --go_out=plugins=grpc,paths=source_relative:./ ./proto/servicepb/service.proto
+	protoc -I./proto --go_out=plugins=grpc,paths=source_relative:./proto ./proto/clusterpb/cluster.proto
+	protoc -I./proto --go_out=plugins=grpc,paths=source_relative:./proto ./proto/projectpb/project.proto
+
+
+
 
 ################## initialized grafana (required root permission)
 # init-grafana:

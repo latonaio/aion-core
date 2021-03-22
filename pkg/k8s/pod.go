@@ -39,7 +39,7 @@ func NewPod(
 	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Pod {
 
 	return &Pod{
-		name:                k8s.getLabelName(serviceName, number, targetNode),
+		name:                k8s.getLabelName(serviceName, number),
 		serviceName:         serviceName,
 		tag:                 tag,
 		number:              number,
@@ -206,7 +206,7 @@ func (p *Pod) getVolumeList() []apiV1.Volume {
 			VolumeSource: apiV1.VolumeSource{
 				ConfigMap: &apiV1.ConfigMapVolumeSource{
 					LocalObjectReference: apiV1.LocalObjectReference{
-						Name: "envoy-config-" + p.k8s.getLabelName(p.serviceName, p.number, p.TargetNode),
+						Name: "envoy-config-" + p.k8s.getLabelName(p.serviceName, p.number),
 					},
 				},
 			},

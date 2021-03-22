@@ -2,9 +2,12 @@
 package microservice
 
 import (
-	"bitbucket.org/latonaio/aion-core/config"
 	"fmt"
 	"strconv"
+
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+
+	"bitbucket.org/latonaio/aion-core/config"
 )
 
 type Container interface {
@@ -29,6 +32,7 @@ func NewScaleContainer(aionHome string, msName string, msData *config.Microservi
 		// Set ms number
 		msData.Env["MS_NUMBER"] = strconv.Itoa(i)
 		var ms Container
+		log.Debugf("NewScaleContainer docker mode: %v", msData.Docker)
 		if msData.Docker {
 			msData.Env["IS_DOCKER"] = "true"
 			ms = NewContainerMicroservice(msName, msData, i)
@@ -38,17 +42,17 @@ func NewScaleContainer(aionHome string, msName string, msData *config.Microservi
 				return nil, err
 			}
 		}
-		cs := &ContainerStatus{
+
+		containerList[i] = &ContainerStatus{
 			Container:    ms,
 			NumOfUpState: 0,
 		}
-		containerList[i] = cs
 	}
-	sc := &ScaleContainer{
+
+	return &ScaleContainer{
 		name:          msName,
 		containerList: containerList,
-	}
-	return sc, nil
+	}, nil
 }
 
 func (sc *ScaleContainer) GetScale() int {

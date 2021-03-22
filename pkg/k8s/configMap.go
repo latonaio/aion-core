@@ -27,7 +27,7 @@ type ConfigMap struct {
 func NewConfigMap(serviceName string, number int, k8s *k8sResource, targetNode string) *ConfigMap {
 	return &ConfigMap{
 		serviceName: serviceName,
-		name:        "envoy-config-" + k8s.getLabelName(serviceName, number, targetNode),
+		name:        "envoy-config-" + k8s.getLabelName(serviceName, number),
 		number:      number,
 		configMap:   k8s.client.CoreV1().ConfigMaps(k8s.namespace),
 		k8s:         k8s,
@@ -56,7 +56,7 @@ func (c *ConfigMap) Apply() error {
 }
 
 func (c *ConfigMap) Delete() error {
-	name := "envoy-config-" + c.k8s.getLabelName(c.serviceName, c.number, "")
+	name := "envoy-config-" + c.k8s.getLabelName(c.serviceName, c.number)
 	client := c.k8s.client.CoreV1().ConfigMaps(c.k8s.namespace)
 	policy := metaV1.DeletePropagationForeground
 

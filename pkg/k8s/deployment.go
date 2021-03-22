@@ -25,7 +25,7 @@ func NewDeployment(
 	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Deployment {
 
 	return &Deployment{
-		name:        k8s.getLabelName(serviceName, number, targetNode),
+		name:        k8s.getLabelName(serviceName, number),
 		serviceName: serviceName,
 		deployment:  k8s.client.AppsV1().Deployments(k8s.namespace),
 		k8s:         k8s,

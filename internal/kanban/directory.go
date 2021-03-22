@@ -1,20 +1,21 @@
 package kanban
 
 import (
-	"bitbucket.org/latonaio/aion-core/pkg/common"
-	"bitbucket.org/latonaio/aion-core/pkg/fswatcher"
-	"bitbucket.org/latonaio/aion-core/pkg/log"
-	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
 	"fmt"
-	"github.com/avast/retry-go"
-	"github.com/golang/protobuf/jsonpb"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"bitbucket.org/latonaio/aion-core/pkg/common"
+	"bitbucket.org/latonaio/aion-core/pkg/fswatcher"
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
+	"github.com/avast/retry-go"
+	"github.com/golang/protobuf/jsonpb"
 )
 
 func NewFileAdapter(aionDataPath string) Adapter {
