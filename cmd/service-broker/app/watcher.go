@@ -64,7 +64,7 @@ func (w *Watcher) WatchReceiveKanban(ctx context.Context, aionCh <-chan *config.
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int) {
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, kanban.StatusType_After)
+	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, kanban.StatusType_After, false)
 	if err != nil {
 		log.Errorf("[watcher] cannot start watch microservice (name:%s, num:%d)", msName, msNumber)
 		return

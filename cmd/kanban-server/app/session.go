@@ -48,7 +48,7 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 
 	s.microserviceName = p.MicroserviceName
 	s.processNumber = int(p.ProcessNumber)
-	ch, err := s.io.WatchKanban(ctx, s.microserviceName, s.processNumber, kanban.StatusType_Before)
+	ch, err := s.io.WatchKanban(ctx, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
 	if err != nil {
 		return err
 	}

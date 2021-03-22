@@ -43,7 +43,7 @@ func NewServer(env *Env) error {
 	}
 
 	kaep := keepalive.EnforcementPolicy{
-		MinTime:             5 * time.Minute,
+		MinTime:             5 * time.Second,
 		PermitWithoutStream: true,
 	}
 
@@ -72,7 +72,6 @@ func NewServer(env *Env) error {
 // callback function when receive message from microservice
 func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServer) error {
 	ctx := stream.Context()
-	log.Printf("connect from microservice")
 
 	var session *Session
 	// create redis pool when recieve gRPC call is no reasonable in terms of speed.
@@ -87,13 +86,24 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 
 	session.dataPath = srv.env.GetDataDir()
 
+	log.Printf(
+		"connect from microservice (name: %s, number: %d)",
+		session.microserviceName,
+		session.processNumber,
+	)
+
 	// get message from client
 	// and then parse message type
 	go func() {
 		for {
 			in, err := stream.Recv()
 			if err != nil {
-				log.Printf("receive stream is closed: %v", err)
+				log.Printf(
+					"receive stream is closed (name: %s, number: %d): %v",
+					session.microserviceName,
+					session.processNumber,
+					err,
+				)
 				return
 			}
 			res, err := parseRequestMessage(ctx, session, in)
@@ -112,10 +122,20 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	go func() {
 		for res := range session.sendCh {
 			if res.Error != "" {
-				log.Printf("grpc server error: %s", res.Error)
+				log.Printf(
+					"grpc server error (name: %s, number: %d): %s",
+					session.microserviceName,
+					session.processNumber,
+					res.Error,
+				)
 			}
 			if err := stream.Send(res); err != nil {
-				log.Printf("grpc send error: %v", err)
+				log.Printf(
+					"grpc send error (name: %s, number: %d): %v",
+					session.microserviceName,
+					session.processNumber,
+					err,
+				)
 			}
 			log.Printf("send message to microservice (name: %s, number: %d, message type: %s)",
 				session.microserviceName, session.processNumber, res.MessageType)

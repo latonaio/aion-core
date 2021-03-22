@@ -33,7 +33,7 @@ func newWatcher(io kanban.Adapter) *Watcher {
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int, statusType kanban.StatusType) {
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, statusType)
+	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, statusType, false)
 	if err != nil {
 		log.Printf("[ERR] %v", err)
 		return

@@ -73,7 +73,7 @@ func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb
 	return nil
 }
 
-func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (<-chan *kanbanpb.StatusKanban, error) {
+func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType, deleteOldKanban bool) (<-chan *kanbanpb.StatusKanban, error) {
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 	ch := make(chan *kanbanpb.StatusKanban)
 	go func() {
@@ -88,6 +88,11 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber 
 					log.Printf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
 					close(ch)
 					return
+				}
+				if deleteOldKanban {
+					if err := my_redis.GetInstance().XDel(streamKey, []string{a.prevID}); err != nil {
+						log.Errorf("cannot delete kanban: (%s:%s)", streamKey, a.prevID)
+					}
 				}
 				a.prevID = nextID
 				k, err := unmarshalKanban(hash)

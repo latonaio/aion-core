@@ -23,6 +23,7 @@ type ContainerStatus struct {
 type ScaleContainer struct {
 	name          string
 	containerList map[int]*ContainerStatus
+	multiple      bool
 }
 
 func NewScaleContainer(aionHome string, msName string, msData *config.Microservice) (*ScaleContainer, error) {
@@ -52,6 +53,7 @@ func NewScaleContainer(aionHome string, msName string, msData *config.Microservi
 	return &ScaleContainer{
 		name:          msName,
 		containerList: containerList,
+		multiple:      msData.Multiple,
 	}, nil
 }
 
@@ -69,7 +71,7 @@ func (sc *ScaleContainer) StartMicroservice(mNum int) error {
 	if _, ok := sc.containerList[mNum]; !ok {
 		return fmt.Errorf("microservice does not exists (name: %s, number:%d)", sc.name, mNum)
 	}
-	if sc.containerList[mNum].NumOfUpState > 0 {
+	if sc.containerList[mNum].NumOfUpState > 0 && !sc.multiple {
 		return fmt.Errorf(
 			"microservice already started, multiple service is not allowed (name: %s, scale: %d, request: %d)",
 			sc.name, len(sc.containerList), mNum)
