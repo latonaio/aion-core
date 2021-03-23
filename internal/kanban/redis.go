@@ -89,12 +89,13 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber 
 					close(ch)
 					return
 				}
+				a.prevID = nextID
 				if deleteOldKanban {
-					if err := my_redis.GetInstance().XDel(streamKey, []string{a.prevID}); err != nil {
-						log.Errorf("cannot delete kanban: (%s:%s)", streamKey, a.prevID)
+					log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, nextID)
+					if err := my_redis.GetInstance().XDel(streamKey, []string{nextID}); err != nil {
+						log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, nextID)
 					}
 				}
-				a.prevID = nextID
 				k, err := unmarshalKanban(hash)
 				if err != nil {
 					log.Printf("[watch kanban] %v (streamKey: %s)", err, streamKey)

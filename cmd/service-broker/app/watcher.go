@@ -54,16 +54,20 @@ func (w *Watcher) WatchReceiveKanban(ctx context.Context, aionCh <-chan *config.
 			if !ok {
 				return
 			}
-			if err := w.sendToNextService(k.AfterKanban, k.NextService, int(k.NextNumber)); err != nil {
-				log.Errorln(err)
+			if err := w.WriteKanban(k.NextService, int(k.NextNumber), k.AfterKanban, kanban.StatusType_Before); err != nil {
+				log.Errorf("[watcher: start microservice] %v", err)
 			}
+			w.startCh <- NewContainer(k.NextService, int(k.NextNumber))
 		}
 	}
 }
 
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int) {
 	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer func() {
+		log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
+		cancel()
+	}()
 	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, kanban.StatusType_After, false)
 	if err != nil {
 		log.Errorf("[watcher] cannot start watch microservice (name:%s, num:%d)", msName, msNumber)
@@ -79,6 +83,14 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 		case k, ok := <-kanbanCh:
 			if !ok {
 				log.Warnf("[watcher] watch kanban closed")
+				return
+			}
+			if k.ConnectionKey == serviceBrokerName {
+				serviceName, number, err := w.terminateServiceParser(k)
+				if err != nil {
+					log.Errorf("[watcher: terminate microservice] %v", err)
+				}
+				w.stopCh <- NewContainer(serviceName, number)
 				return
 			}
 			nextServiceList, err := w.aionSetting.GetNextServiceList(msName, k.ConnectionKey)
@@ -98,29 +110,14 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 				} else {
 					// send to local microservice
 					k.Services[len(k.Services)-1].Device = w.aionSetting.GetDeviceName()
-					if err := w.sendToNextService(k, nextService.NextServiceName, number); err != nil {
-						log.Errorln(err)
+					if err := w.WriteKanban(nextService.NextServiceName, number, k, kanban.StatusType_Before); err != nil {
+						log.Errorf("[watcher: start microservice] %v", err)
 					}
+					w.startCh <- NewContainer(nextService.NextServiceName, number)
 				}
 			}
 		}
 	}
-}
-
-func (w *Watcher) sendToNextService(k *kanbanpb.StatusKanban, serviceName string, number int) error {
-	if serviceName == serviceBrokerName {
-		serviceName, number, err := w.terminateServiceParser(k)
-		if err != nil {
-			return fmt.Errorf("[watcher: terminate microservice] %v", err)
-		}
-		w.stopCh <- NewContainer(serviceName, number)
-	} else {
-		if err := w.WriteKanban(serviceName, number, k, kanban.StatusType_Before); err != nil {
-			return fmt.Errorf("[watcher: start microservice] %v", err)
-		}
-		w.startCh <- NewContainer(serviceName, number)
-	}
-	return nil
 }
 
 func (w *Watcher) terminateServiceParser(k *kanbanpb.StatusKanban) (string, int, error) {

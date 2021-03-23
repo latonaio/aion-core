@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"bitbucket.org/latonaio/aion-core/pkg/log"
 	pb "bitbucket.org/latonaio/aion-core/proto/projectpb"
 	"google.golang.org/grpc"
 )
@@ -21,7 +22,7 @@ func request(client pb.ProjectClient, aion *pb.AionSetting) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("request: %s", reply.Message)
+	fmt.Printf("apply request: %s \n", reply.Message)
 	return nil
 }
 
@@ -48,7 +49,7 @@ func Status(address string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(conn.GetState().String())
+	log.Debugf("grpc con status: %v", conn.GetState().String())
 
 	clt := pb.NewProjectClient(conn)
 	statuses, err := clt.Status(context.Background(), &pb.Empty{})
