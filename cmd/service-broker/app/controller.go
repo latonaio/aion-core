@@ -162,26 +162,10 @@ func (msc *controller) stopMicroservice(name string) error {
 	return nil
 }
 
-func (msc *controller) stopMicroserviceByNum(name string, mNum int) error {
-	ms, ok := msc.microserviceList[name]
-	if !ok {
-		return fmt.Errorf("there is no microservice: %s", name)
-	}
-	if err := ms.StopMicroservice(mNum); err != nil {
-		return err
-	}
-	if msc.config.IsWorkerMode() {
-		msc.SetServiceStatusDeactivate(name)
-	}
-	log.Printf("stop microservice from watcher (name:%s, num:%d)", name, mNum)
-	return nil
-}
-
 func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-chan *config.AionSetting, aionChForWatcher chan<- *config.AionSetting) {
 	var cancel context.CancelFunc
 	var childCtx context.Context
 	startCh := msc.watcher.GetStartCh()
-	stopCh := msc.watcher.GetStopCh()
 	log.Println("WatchKanbanForMicroservice watching aionCh")
 	for {
 		select {
@@ -198,8 +182,8 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 			child, cncl := context.WithCancel(ctx)
 			cancel = cncl
 			childCtx = child
-			msc.Lock()
 			msc.StopAllMicroservice()
+			msc.Lock()
 			msc.aionSetting = as
 			msc.Unlock()
 			log.Debugf("[worker] deploy start with %+v", as)
@@ -214,16 +198,6 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 		case ms := <-startCh:
 			if err := msc.startMicroserviceByNum(childCtx, ms.Name, ms.Number); err != nil {
 				log.Errorf("startMicroserviceByNum failed cause: %v \n", err)
-			}
-		case ms := <-stopCh:
-			if ms.Number == -1 {
-				if err := msc.stopMicroservice(ms.Name); err != nil {
-					log.Errorf("stopMicroservice failed cause: %v \n", err)
-				}
-			} else {
-				if err := msc.stopMicroserviceByNum(ms.Name, ms.Number); err != nil {
-					log.Errorf("stopMicroserviceByNum failed cause: %v \n", err)
-				}
 			}
 		}
 	}
@@ -279,7 +253,6 @@ func (msc *controller) SetServiceStatusActive(serviceName string) {
 
 }
 func (msc *controller) SetServiceStatusDeactivate(serviceName string) {
-
 	msc.Lock()
 	msc.microservicesStatus[serviceName] = false
 	msc.Unlock()

@@ -88,7 +88,8 @@ func (c *ConfigMap) config() (*apiV1.ConfigMap, error) {
 
 	return &apiV1.ConfigMap{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: c.name,
+			Name:      c.name,
+			Namespace: c.k8s.namespace,
 		},
 		Data: map[string]string{
 			"envoy.yaml": strConf,

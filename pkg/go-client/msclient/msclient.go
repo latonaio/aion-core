@@ -3,11 +3,16 @@
 package msclient
 
 import (
-	"bitbucket.org/latonaio/aion-core/pkg/log"
-	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	_struct "github.com/golang/protobuf/ptypes/struct"
@@ -16,8 +21,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/protobuf/encoding/protojson"
-	"strings"
-	"time"
 )
 
 // Option defines type of function that sets data to output request.
@@ -108,9 +111,9 @@ func SetDeviceName(n string) Option {
 
 // MicroserviceClient declares communication function between kanban and microservice.
 type MicroserviceClient interface {
-	GetOneKanban(serviceName string, processNumber int) (*WrapKanban, error)
-	GetKanbanCh(serviceName string, processNumber int) (chan *WrapKanban, error)
-	SetKanban(serviceName string, processNumber int) (*WrapKanban, error)
+	GetOneKanban() (*WrapKanban, error)
+	GetKanbanCh() (chan *WrapKanban, error)
+	SetKanban() (*WrapKanban, error)
 	OutputKanban(data *kanbanpb.OutputRequest) error
 	Close() error
 	GetProcessNumber() int
@@ -124,6 +127,7 @@ type microserviceClient struct {
 	sendCh       chan *kanbanpb.Request
 	ackCh        chan string
 	recvKanbanCh chan *WrapKanban
+	serviceName  string
 }
 
 // Env has environment information.
@@ -134,7 +138,7 @@ type Env struct {
 }
 
 // NewKanbanClient constructs kanban client object.
-func NewKanbanClient(ctx context.Context) (MicroserviceClient, error) {
+func NewKanbanClient(ctx context.Context, serviceName string) (MicroserviceClient, error) {
 	// get env
 	var env Env
 	envconfig.Process("", &env)
@@ -225,6 +229,7 @@ func NewKanbanClient(ctx context.Context) (MicroserviceClient, error) {
 		recvKanbanCh: recvKanbanCh,
 		conn:         conn,
 		env:          env,
+		serviceName:  serviceName,
 	}
 	return c, nil
 }
@@ -242,10 +247,10 @@ func (k *microserviceClient) sendRequest(messageType kanbanpb.RequestType, body 
 	return nil
 }
 
-func (k *microserviceClient) sendKanbanRequest(messageType kanbanpb.RequestType, serviceName string, processNumber int) error {
+func (k *microserviceClient) sendKanbanRequest(messageType kanbanpb.RequestType) error {
 	m := &kanbanpb.InitializeService{
-		MicroserviceName: serviceName,
-		ProcessNumber:    int32(processNumber),
+		MicroserviceName: k.serviceName,
+		ProcessNumber:    int32(k.env.MsNumber),
 	}
 	if err := k.sendRequest(messageType, m); err != nil {
 		return err
@@ -254,8 +259,8 @@ func (k *microserviceClient) sendKanbanRequest(messageType kanbanpb.RequestType,
 }
 
 // SetKanban sets service name and process number to kanban.
-func (k *microserviceClient) SetKanban(serviceName string, processNumber int) (*WrapKanban, error) {
-	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN, serviceName, processNumber); err != nil {
+func (k *microserviceClient) SetKanban() (*WrapKanban, error) {
+	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN); err != nil {
 		return nil, err
 	}
 	select {
@@ -270,8 +275,8 @@ func (k *microserviceClient) SetKanban(serviceName string, processNumber int) (*
 }
 
 // GetOneKanban gets one kanban.
-func (k *microserviceClient) GetOneKanban(serviceName string, processNumber int) (*WrapKanban, error) {
-	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE, serviceName, processNumber); err != nil {
+func (k *microserviceClient) GetOneKanban() (*WrapKanban, error) {
+	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE); err != nil {
 		return nil, err
 	}
 	select {
@@ -286,8 +291,8 @@ func (k *microserviceClient) GetOneKanban(serviceName string, processNumber int)
 }
 
 // GetKanbanCh gets kanban channel.
-func (k *microserviceClient) GetKanbanCh(serviceName string, processNumber int) (chan *WrapKanban, error) {
-	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE, serviceName, processNumber); err != nil {
+func (k *microserviceClient) GetKanbanCh() (chan *WrapKanban, error) {
+	if err := k.sendKanbanRequest(kanbanpb.RequestType_START_SERVICE); err != nil {
 		return nil, err
 	}
 	return k.recvKanbanCh, nil
@@ -309,10 +314,42 @@ func (k *microserviceClient) OutputKanban(data *kanbanpb.OutputRequest) error {
 	return nil
 }
 
+func (k *microserviceClient) sendTerminateKanban() error {
+
+	var metadata map[string]string
+	metadata["type"] = "terminate"
+	metadata["number"] = strconv.Itoa(k.env.MsNumber)
+	metadata["name"] = k.serviceName
+	b, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("cant marshal metadata to json binary: %v", err)
+	}
+	s := &_struct.Struct{}
+	if err := protojson.Unmarshal(b, s); err != nil {
+		return fmt.Errorf("cant unmarshal metadata to protobuf struct: %v\n", err)
+	}
+	d := &kanbanpb.OutputRequest{
+		PriorSuccess:  true,
+		DataPath:      "",
+		ConnectionKey: "service-broker",
+		ProcessNumber: int32(k.env.MsNumber),
+		FileList:      []string{},
+		Metadata:      s,
+		DeviceName:    "",
+	}
+	if err := k.OutputKanban(d); err != nil {
+		return fmt.Errorf("cant send terminate kanban: %v", err)
+	}
+	return nil
+}
+
 // Close closes the microservice client.
 func (k *microserviceClient) Close() error {
 	var errStr []string
 	if k.stream != nil {
+		if err := k.sendTerminateKanban(); err != nil {
+			errStr = append(errStr, err.Error())
+		}
 		if err := k.stream.CloseSend(); err != nil {
 			errStr = append(errStr, err.Error())
 		}

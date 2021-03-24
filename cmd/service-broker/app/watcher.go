@@ -23,8 +23,8 @@ const (
 type Watcher struct {
 	sync.Mutex
 	kanban.Adapter
+
 	startCh chan *Container
-	stopCh  chan *Container
 	// send anything grpc server
 	deviceController *devices.Controller
 	aionSetting      *config.AionSetting
@@ -34,7 +34,6 @@ func NewWatcher(dc *devices.Controller, io kanban.Adapter) *Watcher {
 	return &Watcher{
 		Adapter:          io,
 		startCh:          NewContainerCh(),
-		stopCh:           NewContainerCh(),
 		deviceController: dc,
 	}
 }
@@ -86,12 +85,20 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 				return
 			}
 			if k.ConnectionKey == serviceBrokerName {
-				serviceName, number, err := w.terminateServiceParser(k)
+				serviceName, _, err := w.terminateServiceParser(k)
 				if err != nil {
 					log.Errorf("[watcher: terminate microservice] %v", err)
+					continue
 				}
-				w.stopCh <- NewContainer(serviceName, number)
-				return
+				msList := w.aionSetting.GetMicroserviceList()
+				msData, ok := msList[serviceName]
+				if !ok {
+					log.Errorf("[watcher: terminate microservice] not found such as service: %s", serviceName)
+					continue
+				}
+				if !msData.Always {
+					return
+				}
 			}
 			nextServiceList, err := w.aionSetting.GetNextServiceList(msName, k.ConnectionKey)
 			if err != nil {
@@ -150,10 +157,6 @@ func (w *Watcher) terminateServiceParser(k *kanbanpb.StatusKanban) (string, int,
 
 func (w *Watcher) GetStartCh() chan *Container {
 	return w.startCh
-}
-
-func (w *Watcher) GetStopCh() chan *Container {
-	return w.stopCh
 }
 
 func NewContainerCh() chan *Container {

@@ -76,8 +76,9 @@ func (s *Service) config() *apiV1.Service {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Labels: s.k8s.getLabelMap(s.serviceName, s.number),
-			Name:   s.name,
+			Labels:    s.k8s.getLabelMap(s.serviceName, s.number),
+			Name:      s.name,
+			Namespace: s.k8s.namespace,
 		},
 		Spec: apiV1.ServiceSpec{
 			Type:         s.getServiceType(),

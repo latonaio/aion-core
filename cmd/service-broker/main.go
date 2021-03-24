@@ -101,7 +101,7 @@ func masterServer(workerStatusMonitoringCh chan<- map[string]map[string]bool, en
 }
 
 func workerClient(ctx context.Context, env *app.Config, msc mscStatus, applyAionSettingCh chan<- *config.AionSetting) {
-	conn, err := grpc.DialContext(ctx, "aion-servicebroker.master:11110", grpc.WithInsecure())
+	conn, err := grpc.DialContext(ctx, "aion-servicebroker.master.svc.cluster.local:11110", grpc.WithInsecure())
 	defer func() {
 		if err := conn.Close(); err != nil {
 			log.Printf("[worker] grpc conn close failed cause :%v", err)
