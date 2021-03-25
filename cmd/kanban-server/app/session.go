@@ -76,8 +76,10 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 	s.microserviceName = p.MicroserviceName
 	s.processNumber = int(p.ProcessNumber)
 
-	ch, err := s.io.WatchKanban(ctx, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
+	childCtx, cancel := context.WithCancel(ctx)
+	ch, err := s.io.WatchKanban(childCtx, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
 	if err != nil {
+		cancel()
 		return err
 	}
 
@@ -89,10 +91,12 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 			select {
 			case <-ctx.Done():
 				s.deactivate()
+				cancel()
 				return
 			case kanban, ok := <-ch:
 				if !ok {
 					s.deactivate()
+					cancel()
 					return
 				}
 				anyMsg, err := ptypes.MarshalAny(kanban)

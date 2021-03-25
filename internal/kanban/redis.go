@@ -77,9 +77,11 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber 
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 	ch := make(chan *kanbanpb.StatusKanban)
 	go func() {
+		log.Printf("[watch kanban] start watch kanban %s:%d", msName, msNumber)
 		for {
 			select {
 			case <-ctx.Done():
+				log.Printf("[watch kanban] stop watch kanban %s:%d", msName, msNumber)
 				close(ch)
 				return
 			default:
@@ -90,19 +92,19 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber 
 					return
 				}
 				a.prevID = nextID
-				if deleteOldKanban {
-					log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, nextID)
-					if err := my_redis.GetInstance().XDel(streamKey, []string{nextID}); err != nil {
-						log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, nextID)
-					}
-				}
 				k, err := unmarshalKanban(hash)
 				if err != nil {
-					log.Printf("[watch kanban] %v (streamKey: %s)", err, streamKey)
+					log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
 					continue
 				}
 				log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
 				ch <- k
+				if deleteOldKanban {
+					log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, a.prevID)
+					if err := my_redis.GetInstance().XDel(streamKey, []string{a.prevID}); err != nil {
+						log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, a.prevID)
+					}
+				}
 			}
 		}
 	}()
