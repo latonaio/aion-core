@@ -67,11 +67,8 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 		log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
 		cancel()
 	}()
-	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, kanban.StatusType_After, false)
-	if err != nil {
-		log.Errorf("[watcher] cannot start watch microservice (name:%s, num:%d)", msName, msNumber)
-		return
-	}
+	kanbanCh := make(chan *kanbanpb.StatusKanban)
+	go w.WatchKanban(childCtx, kanbanCh, msName, msNumber, kanban.StatusType_After, false)
 
 	log.Printf("[watcher] start watch microservice : %s-%03d\n", msName, msNumber)
 	for {

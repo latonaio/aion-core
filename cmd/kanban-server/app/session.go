@@ -38,12 +38,13 @@ func NewMicroserviceSessionWithFile(dataPath string) *Session {
 
 // create struct of session with service broker
 func newSession(io kanban.Adapter) *Session {
+	sendCh := make(chan *kanbanpb.Response)
 	return &Session{
 		io:               io, // kanban io ( redis or directory )
 		microserviceName: "",
 		cacheKanban:      nil,
 		processNumber:    0,
-		sendCh:           nil,
+		sendCh:           sendCh,
 		isActive:         false,
 	}
 }
@@ -54,7 +55,6 @@ func (s *Session) IsActive() bool {
 
 func (s *Session) activate() {
 	s.Lock()
-	s.sendCh = make(chan *kanbanpb.Response)
 	s.isActive = true
 	s.Unlock()
 }
@@ -77,11 +77,8 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 	s.processNumber = int(p.ProcessNumber)
 
 	childCtx, cancel := context.WithCancel(ctx)
-	ch, err := s.io.WatchKanban(childCtx, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
-	if err != nil {
-		cancel()
-		return err
-	}
+	ch := make(chan *kanbanpb.StatusKanban)
+	go s.io.WatchKanban(childCtx, ch, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
 
 	go func() {
 		currentServiceData := &kanbanpb.ServiceData{

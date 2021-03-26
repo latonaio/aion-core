@@ -67,6 +67,23 @@ func NewServer(env *Env) error {
 	}
 }
 
+func sendResponse(stream kanbanpb.Kanban_MicroserviceConnServer, res *kanbanpb.Response, session *Session) {
+	if err := stream.Send(res); err != nil {
+		log.Printf(
+			"grpc send error (name: %s, number: %d): %v",
+			session.microserviceName,
+			session.processNumber,
+			err,
+		)
+	}
+	log.Printf(
+		"send message to microservice (name: %s, number: %d, message type: %s)",
+		session.microserviceName,
+		session.processNumber,
+		res.MessageType,
+	)
+}
+
 // callback function when receive message from microservice
 func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServer) error {
 	ctx, cancel := context.WithCancel(stream.Context())
@@ -88,30 +105,38 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	session.dataPath = srv.env.GetDataDir()
 
 	// receive kanban from redis and send client microservice
+	recvCh := make(chan *kanbanpb.Response)
 	go func() {
-		for res := range session.sendCh {
-			if res.Error != "" {
-				log.Printf(
-					"grpc server error (name: %s, number: %d): %s",
-					session.microserviceName,
-					session.processNumber,
-					res.Error,
-				)
+		for {
+			select {
+			case res, ok := <-session.sendCh:
+				if !ok {
+					return
+				}
+				if res.Error != "" {
+					log.Printf(
+						"grpc server error (name: %s, number: %d): %s",
+						session.microserviceName,
+						session.processNumber,
+						res.Error,
+					)
+				}
+				sendResponse(stream, res, session)
+			case res, ok := <-recvCh:
+				if !ok {
+					return
+				}
+				if res.Error != "" {
+					log.Printf(
+						"kanban parse error (name: %s, number: %d): %s",
+						session.microserviceName,
+						session.processNumber,
+						res.Error,
+					)
+				}
+				sendResponse(stream, res, session)
 			}
-			if err := stream.Send(res); err != nil {
-				log.Printf(
-					"grpc send error (name: %s, number: %d): %v",
-					session.microserviceName,
-					session.processNumber,
-					err,
-				)
-			}
-			log.Printf(
-				"send message to microservice (name: %s, number: %d, message type: %s)",
-				session.microserviceName,
-				session.processNumber,
-				res.MessageType,
-			)
+
 		}
 	}()
 
@@ -128,6 +153,10 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 			return nil
 		}
 		res, terminated, err := parseRequestMessage(ctx, session, in)
+		if terminated {
+			log.Printf("received terminate message: (%s:%d)", session.microserviceName, session.processNumber)
+			return nil
+		}
 		if err != nil {
 			log.Errorf(
 				"cant parse request (name: %s, number %d):  %v",
@@ -139,18 +168,7 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 		}
 		// send write kanban result
 		if res != nil {
-			if err := stream.Send(res); err != nil {
-				log.Errorf(
-					"grpc send error (name: %s, number %d):  %v",
-					session.microserviceName,
-					session.processNumber,
-					err,
-				)
-			}
-		}
-		if terminated {
-			log.Printf("received terminate message: (%s:%d)", session.microserviceName, session.processNumber)
-			return nil
+			recvCh <- res
 		}
 	}
 }

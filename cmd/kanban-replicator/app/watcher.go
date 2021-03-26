@@ -33,17 +33,18 @@ func newWatcher(io kanban.Adapter) *Watcher {
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int, statusType kanban.StatusType) {
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, statusType, false)
-	if err != nil {
-		log.Printf("[ERR] %v", err)
-		return
-	}
+	kanbanCh := make(chan *kanbanpb.StatusKanban)
+	go w.WatchKanban(childCtx, kanbanCh, msName, msNumber, statusType, false)
+
 	streamKey := getStreamKey(msName, msNumber, statusType)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case k := <-kanbanCh:
+		case k, ok := <-kanbanCh:
+			if !ok {
+				return
+			}
 			w.WriteKanbanMongo(ctx, k, streamKey)
 		}
 	}
