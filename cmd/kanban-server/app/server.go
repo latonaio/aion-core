@@ -67,7 +67,7 @@ func NewServer(env *Env) error {
 	}
 }
 
-func sendResponse(stream kanbanpb.Kanban_MicroserviceConnServer, res *kanbanpb.Response, session *Session) {
+func sendResponse(stream kanbanpb.Kanban_MicroserviceConnServer, res *kanbanpb.Response, session *Session) error {
 	if err := stream.Send(res); err != nil {
 		log.Printf(
 			"grpc send error (name: %s, number: %d): %v",
@@ -75,6 +75,7 @@ func sendResponse(stream kanbanpb.Kanban_MicroserviceConnServer, res *kanbanpb.R
 			session.processNumber,
 			err,
 		)
+		return err
 	}
 	log.Printf(
 		"send message to microservice (name: %s, number: %d, message type: %s)",
@@ -82,6 +83,7 @@ func sendResponse(stream kanbanpb.Kanban_MicroserviceConnServer, res *kanbanpb.R
 		session.processNumber,
 		res.MessageType,
 	)
+	return nil
 }
 
 // callback function when receive message from microservice
@@ -107,68 +109,69 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	// receive kanban from redis and send client microservice
 	recvCh := make(chan *kanbanpb.Response)
 	go func() {
+		defer close(recvCh)
+		// receive kanban from client microservice and write kanban in redis
 		for {
-			select {
-			case res, ok := <-session.sendCh:
-				if !ok {
-					return
-				}
-				if res.Error != "" {
-					log.Printf(
-						"grpc server error (name: %s, number: %d): %s",
-						session.microserviceName,
-						session.processNumber,
-						res.Error,
-					)
-				}
-				sendResponse(stream, res, session)
-			case res, ok := <-recvCh:
-				if !ok {
-					return
-				}
-				if res.Error != "" {
-					log.Printf(
-						"kanban parse error (name: %s, number: %d): %s",
-						session.microserviceName,
-						session.processNumber,
-						res.Error,
-					)
-				}
-				sendResponse(stream, res, session)
+			in, err := stream.Recv()
+			if err != nil {
+				log.Printf(
+					"receive stream is closed (name: %s, number: %d): %v",
+					session.microserviceName,
+					session.processNumber,
+					err,
+				)
+				return
 			}
-
+			res, terminated, err := parseRequestMessage(ctx, session, in)
+			if terminated {
+				log.Printf("received terminate message: (%s:%d)", session.microserviceName, session.processNumber)
+				return
+			}
+			if err != nil {
+				log.Errorf(
+					"cant parse request (name: %s, number %d):  %v",
+					session.microserviceName,
+					session.processNumber,
+					err,
+				)
+				res.Error = err.Error()
+			}
+			// send write kanban result
+			if res != nil {
+				recvCh <- res
+			}
 		}
 	}()
 
-	// receive kanban from client microservice and write kanban in redis
 	for {
-		in, err := stream.Recv()
-		if err != nil {
-			log.Printf(
-				"receive stream is closed (name: %s, number: %d): %v",
-				session.microserviceName,
-				session.processNumber,
-				err,
-			)
-			return nil
-		}
-		res, terminated, err := parseRequestMessage(ctx, session, in)
-		if terminated {
-			log.Printf("received terminate message: (%s:%d)", session.microserviceName, session.processNumber)
-			return nil
-		}
-		if err != nil {
-			log.Errorf(
-				"cant parse request (name: %s, number %d):  %v",
-				session.microserviceName,
-				session.processNumber,
-				err,
-			)
-			res.Error = err.Error()
-		}
-		// send write kanban result
-		if res != nil {
-			recvCh <- res
+		select {
+		case res, ok := <-session.sendCh:
+			if !ok {
+				return nil
+			}
+			if res.Error != "" {
+				log.Printf(
+					"grpc server error (name: %s, number: %d): %s",
+					session.microserviceName,
+					session.processNumber,
+					res.Error,
+				)
+			}
+			if err := sendResponse(stream, res, session); err != nil {
+			}
+		case res, ok := <-recvCh:
+			if !ok {
+				return nil
+			}
+			if res.Error != "" {
+				log.Printf(
+					"kanban parse error (name: %s, number: %d): %s",
+					session.microserviceName,
+					session.processNumber,
+					res.Error,
+				)
+			}
+			sendResponse(stream, res, session)
 		}
 	}
 }
