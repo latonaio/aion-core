@@ -153,17 +153,12 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) (*kanbanpb.Response, b
 		return res, false
 	}
 
-	nextServiceData := &kanbanpb.ServiceData{
-		Name:   "",
-		Device: p.DeviceName,
-	}
 	// set metadata to after kanban
 	afterKanban := s.cacheKanban
 	afterKanban.FinishAt = common.GetIsoDatetime()
 	afterKanban.PriorSuccess = p.PriorSuccess
 	afterKanban.FileList = p.FileList
 	afterKanban.Metadata = p.Metadata
-	afterKanban.Services = append(afterKanban.Services, nextServiceData)
 	afterKanban.ProcessNumber = p.ProcessNumber
 	afterKanban.ConnectionKey = p.ConnectionKey
 

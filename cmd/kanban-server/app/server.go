@@ -158,6 +158,7 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 				)
 			}
 			if err := sendResponse(stream, res, session); err != nil {
+				return err
 			}
 		case res, ok := <-recvCh:
 			if !ok {
@@ -171,7 +172,9 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 					res.Error,
 				)
 			}
-			sendResponse(stream, res, session)
+			if err := sendResponse(stream, res, session); err != nil {
+				return err
+			}
 		}
 	}
 }
