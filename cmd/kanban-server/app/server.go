@@ -97,11 +97,12 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	var session *Session
 	// create redis pool when recieve gRPC call is no reasonable in terms of speed.
 	// but we should do this becase must close connection to don't overflow block xread connection.
-	if err := my_redis.GetInstance().CreatePool(srv.env.GetRedisAddr()); err != nil {
+	redis := my_redis.GetInstance()
+	if err := redis.CreatePool(srv.env.GetRedisAddr()); err != nil {
 		log.Printf("cant connect to redis, use directory mode: %v", err)
 		session = NewMicroserviceSessionWithFile(srv.env.GetAionHome())
 	} else {
-		session = NewMicroserviceSessionWithRedis()
+		session = NewMicroserviceSessionWithRedis(redis)
 	}
 
 	session.dataPath = srv.env.GetDataDir()

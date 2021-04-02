@@ -11,13 +11,15 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 )
 
-func NewRedisAdapter() Adapter {
+func NewRedisAdapter(redis *my_redis.RedisClient) Adapter {
 	return &RedisAdaptor{
+		redis:  redis,
 		prevID: "0",
 	}
 }
 
 type RedisAdaptor struct {
+	redis  *my_redis.RedisClient
 	prevID string
 }
 
@@ -66,7 +68,7 @@ func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb
 		return fmt.Errorf("[write kanban] cant marshal kanban, %v", err)
 	}
 	val := map[string]interface{}{"kanban": kanbanJson}
-	if err := my_redis.GetInstance().XAdd(streamKey, val); err != nil {
+	if err := a.redis.XAdd(streamKey, val); err != nil {
 		return fmt.Errorf("[write kanban] cant write kanban to redis, %v", err)
 	}
 	log.Printf("[write kanban] write to queue (streamkey: %s)", streamKey)
@@ -82,15 +84,15 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanp
 	ch := make(chan *kanbanpb.StatusKanban)
 	go func() {
 		for {
-			hash, nextID, err := my_redis.GetInstance().XReadOne([]string{streamKey}, []string{a.prevID}, 1, 0)
+			hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{a.prevID}, 1, 0)
 			if err != nil {
-				log.Printf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
+				log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
 				close(ch)
 				return
 			}
 			if deleteOldKanban {
 				log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, a.prevID)
-				if err := my_redis.GetInstance().XDel(streamKey, []string{a.prevID}); err != nil {
+				if err := a.redis.XDel(streamKey, []string{a.prevID}); err != nil {
 					log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, a.prevID)
 				}
 			}

@@ -12,6 +12,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_mongo"
+	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -20,8 +21,8 @@ type Watcher struct {
 	kanban.Adapter
 }
 
-func NewRequestRedisWatcher() *Watcher {
-	return newWatcher(kanban.NewRedisAdapter())
+func NewRequestRedisWatcher(redis *my_redis.RedisClient) *Watcher {
+	return newWatcher(kanban.NewRedisAdapter(redis))
 }
 
 func newWatcher(io kanban.Adapter) *Watcher {

@@ -9,6 +9,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/common"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"github.com/golang/protobuf/ptypes"
 	_struct "github.com/golang/protobuf/ptypes/struct"
@@ -27,8 +28,8 @@ type Session struct {
 }
 
 // create microservice session
-func NewMicroserviceSessionWithRedis() *Session {
-	return newSession(kanban.NewRedisAdapter())
+func NewMicroserviceSessionWithRedis(redis *my_redis.RedisClient) *Session {
+	return newSession(kanban.NewRedisAdapter(redis))
 }
 
 // create microservice session

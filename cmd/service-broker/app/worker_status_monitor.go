@@ -22,9 +22,9 @@ func (m AionStatus) MarshalBinary() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func NewWorkerStatusMonitor(nmch <-chan map[string]map[string]bool) *WorkerStatusMonitor {
+func NewWorkerStatusMonitor(nmch <-chan map[string]map[string]bool, redis *my_redis.RedisClient) *WorkerStatusMonitor {
 	return &WorkerStatusMonitor{
-		Rdisc:    my_redis.GetInstance(),
+		Rdisc:    redis,
 		RdisKey:  redisKey,
 		WorkerCh: nmch,
 	}

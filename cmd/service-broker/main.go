@@ -13,6 +13,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/internal/services"
 	"bitbucket.org/latonaio/aion-core/pkg/k8s"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	clspb "bitbucket.org/latonaio/aion-core/proto/clusterpb"
 	pjpb "bitbucket.org/latonaio/aion-core/proto/projectpb"
 	"google.golang.org/grpc"
@@ -62,7 +63,11 @@ func main() {
 		// start grpc server
 		go masterServer(workerStatusMonitoringCh, env)
 		// start worker status monitor
-		go app.NewWorkerStatusMonitor(workerStatusMonitoringCh).Start()
+		redis := my_redis.GetInstance()
+		if err := redis.CreatePool(env.GetRedisAddr()); err != nil {
+			log.Warnf("cant connect to redis, use directory mode: %v", err)
+		}
+		go app.NewWorkerStatusMonitor(workerStatusMonitoringCh, redis).Start()
 	case app.WorkerMode:
 		// start grpc client
 		go workerClient(ctx, env, msc, aionCh)

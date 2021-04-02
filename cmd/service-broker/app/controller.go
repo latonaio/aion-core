@@ -206,13 +206,14 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-chan *config.AionSetting) (*controller, error) {
 	// kanban use redis or file
 	var adapter kanban.Adapter
-	if err := my_redis.GetInstance().CreatePool(env.GetRedisAddr()); err != nil {
+	redis := my_redis.GetInstance()
+	if err := redis.CreatePool(env.GetRedisAddr()); err != nil {
 		log.Warnf("cant connect to redis, use directory mode: %v", err)
 		adapter = kanban.NewFileAdapter(env.GetDataDir())
 	} else {
 		log.Printf("Use redis mode")
-		adapter = kanban.NewRedisAdapter()
-		if err := my_redis.GetInstance().FlushAll(); err != nil {
+		adapter = kanban.NewRedisAdapter(redis)
+		if err := redis.FlushAll(); err != nil {
 			log.Errorf("cant initialized redis: %v", err)
 		}
 	}

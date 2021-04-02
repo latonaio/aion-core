@@ -9,10 +9,6 @@ import (
 	"github.com/go-redis/redis/v7"
 )
 
-var (
-	instance = &RedisClient{}
-)
-
 const (
 	connRetryCount = 10
 )
@@ -22,7 +18,7 @@ type RedisClient struct {
 }
 
 func GetInstance() *RedisClient {
-	return instance
+	return &RedisClient{}
 }
 
 func (rc *RedisClient) CreatePool(addr string) error {
@@ -76,13 +72,13 @@ func (rc *RedisClient) XReadOne(streamKeys []string, ids []string, count int, bl
 		Block:   block,
 	}).Result()
 	if err != nil {
-		return nil, "", fmt.Errorf("cant read by stream")
+		return nil, "", fmt.Errorf("cant read by stream: %v", err)
 	}
 	if len(ret) == 0 {
-		return nil, "", fmt.Errorf("stream length is zero")
+		return nil, "", fmt.Errorf("stream length is zero: %v", err)
 	}
 	if len(ret[0].Messages) == 0 {
-		return nil, "", fmt.Errorf("message length is zero")
+		return nil, "", fmt.Errorf("message length is zero: %v", err)
 	}
 	return ret[0].Messages[0].Values, ret[0].Messages[0].ID, nil
 }

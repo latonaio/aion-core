@@ -67,6 +67,9 @@ func (p *ProjectServer) Delete(ctx context.Context, prj *pb.AionSetting) (*pb.Re
 
 func (p *ProjectServer) Status(context.Context, *pb.Empty) (*pb.Services, error) {
 	rdsCon := my_redis.GetInstance()
+	if err := rdsCon.CreatePool("redis-cluster"); err != nil {
+		log.Warnf("cant connect to redis, use directory mode: %v", err)
+	}
 	result, err := rdsCon.HGet("aion-cluster-status")
 	if err != nil {
 		log.Printf("[WorkerMonitor][GetAllServicesStatus] failed cause: %v", err)

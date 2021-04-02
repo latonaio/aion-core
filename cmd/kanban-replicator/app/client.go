@@ -19,7 +19,8 @@ type Client struct {
 // connect to redis server and start grpc server
 func NewClient(ctx context.Context, conf *Config) *Client {
 	// create redis pool
-	if err := my_redis.GetInstance().CreatePool(conf.GetRedisAddr()); err != nil {
+	redis := my_redis.GetInstance()
+	if err := redis.CreatePool(conf.GetRedisAddr()); err != nil {
 		log.Fatalf("cant connect to redis, exit kanban-replicator: %v", err)
 	}
 
@@ -30,7 +31,7 @@ func NewClient(ctx context.Context, conf *Config) *Client {
 
 	return &Client{
 		aionHome: conf.GetAionHome(),
-		watcher:  NewRequestRedisWatcher(),
+		watcher:  NewRequestRedisWatcher(redis),
 	}
 }
 
