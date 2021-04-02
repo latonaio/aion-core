@@ -45,7 +45,15 @@ func NewServer(env *Env) error {
 		PermitWithoutStream: true,
 	}
 
-	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep))
+	kasp := keepalive.ServerParameters{
+		Time:    2 * time.Minute,
+		Timeout: 1 * time.Minute,
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.KeepaliveEnforcementPolicy(kaep),
+		grpc.KeepaliveParams(kasp),
+	)
 	kanbanpb.RegisterKanbanServer(grpcServer, server)
 	log.Printf("Start Status kanban server:%d", env.GetServerPort())
 
