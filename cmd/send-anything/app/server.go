@@ -82,7 +82,7 @@ func (srv *Server) ServiceBrokerConn(stream kanbanpb.SendAnything_ServiceBrokerC
 				return
 			}
 			log.Printf("[ServiceBrokerConn] receive from service broker")
-			if err := sendToOtherDeviceClient(ctx, in, srv.env.ServerPort); err != nil {
+			if err := sendToOtherDeviceClient(ctx, in, srv.env.ClientPort); err != nil {
 				log.Printf("%v", err)
 			}
 		}
@@ -169,54 +169,27 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 		switch in.Code {
 		// receive kanban
 		case kanbanpb.UploadRequestCode_SendingKanban:
-			if err := ptypes.UnmarshalAny(in.Context, kContainer); err != nil {
-				return fmt.Sprintf("cant unmarshal any, %v", err), kanbanpb.UploadStatusCode_Failed
-			}
-			dirPath = common.GetMsDataPath(dirPath, kContainer.NextService, int(kContainer.NextNumber))
-			if f, err := os.Stat(dirPath); os.IsNotExist(err) || !f.IsDir() {
-				if err := os.Mkdir(dirPath, 0775); err != nil {
-					log.Printf("[SendToOtherDevices server] cant create directory, %v", err)
-				}
-			}
-			log.Printf("[SendToOtherDevices server] receive kanban (nextService: %s)", kContainer.NextService)
-
 			// receive file
+			if err := sendingKanban(in, kContainer, &dirPath); err != nil {
+				return err.Error(), kanbanpb.UploadStatusCode_Failed
+			}
 		case kanbanpb.UploadRequestCode_SendingFile_CONT:
 			if err := ptypes.UnmarshalAny(in.Context, chunk); err != nil {
 				return fmt.Sprintf("cant unmarshal any, %v", err), kanbanpb.UploadStatusCode_Failed
 			}
 			recvFileBuf = append(recvFileBuf, chunk.Context...)
 		case kanbanpb.UploadRequestCode_SendingFile_EOF:
-			fileName := filepath.Base(chunk.Name)
-			filePath := path.Join(dirPath, fileName)
-			if f, err := os.Stat(dirPath); os.IsNotExist(err) || !f.IsDir() {
-				if err := os.MkdirAll(dirPath, 0775); err != nil {
-					log.Printf("[SendToOtherDevices server] cant create directory, %v", err)
-				}
+			// receive eos
+			if err := sendingFileEOF(in, chunk, recvFileBuf, dirPath, &numOfOutputFile); err != nil {
+				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
-			f, err := os.Create(filePath)
-			if err != nil {
-				return fmt.Sprintf("cant open output path: %v", err),
-					kanbanpb.UploadStatusCode_Failed
-			}
-			if _, err := f.Write(recvFileBuf); err != nil {
-				f.Close()
-				return fmt.Sprintf("cant write output file: %v", err),
-					kanbanpb.UploadStatusCode_Failed
-			}
-			log.Printf("[SendToOtherDevices server] success to write file (%s)", filePath)
-			fileName = ""
-			recvFileBuf = []byte{}
-			numOfOutputFile += 1
-			f.Close()
-		// receive eos
 		case kanbanpb.UploadRequestCode_EOS:
+			// receive eof from stream
 			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
 				return fmt.Sprintf("enough files haven't received yet"), kanbanpb.UploadStatusCode_Failed
 			}
 			srv.sendToServiceBrokerCh <- kContainer
 			return fmt.Sprintf("all files are received"), kanbanpb.UploadStatusCode_OK
-		// receive eof from stream
 		default:
 			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
 				return fmt.Sprintf("enough files haven't received yet"), kanbanpb.UploadStatusCode_Failed
@@ -225,4 +198,41 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 			return fmt.Sprintf("all files are received"), kanbanpb.UploadStatusCode_OK
 		}
 	}
+}
+func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, dirPath *string) error {
+	if err := ptypes.UnmarshalAny(in.Context, kContainer); err != nil {
+		return fmt.Errorf("cant unmarshal any, %v", err)
+	}
+	*dirPath = common.GetMsDataPath(*dirPath, kContainer.NextService, int(kContainer.NextNumber))
+	if f, err := os.Stat(*dirPath); os.IsNotExist(err) || !f.IsDir() {
+		if err := os.Mkdir(*dirPath, 0775); err != nil {
+			log.Printf("[SendToOtherDevices server] cant create directory, %v", err)
+		}
+	}
+	log.Printf("[SendToOtherDevices server] receive kanban (nextService: %s)", kContainer.NextService)
+	return nil
+}
+
+func sendingFileEOF(in *kanbanpb.SendContext, chunk *kanbanpb.Chunk, recvFileBuf []byte, dirPath string, numOfOutputFile *int) error {
+	fileName := filepath.Base(chunk.Name)
+	filePath := path.Join(dirPath, fileName)
+	if f, err := os.Stat(dirPath); os.IsNotExist(err) || !f.IsDir() {
+		if err := os.MkdirAll(dirPath, 0775); err != nil {
+			log.Printf("[SendToOtherDevices server] cant create directory, %v", err)
+		}
+	}
+	f, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("cant open output path: %v", err)
+	}
+	if _, err := f.Write(recvFileBuf); err != nil {
+		f.Close()
+		return fmt.Errorf("cant write output file: %v", err)
+	}
+	log.Printf("[SendToOtherDevices server] success to write file (%s)", filePath)
+	fileName = ""
+	recvFileBuf = []byte{}
+	*numOfOutputFile += 1
+	f.Close()
+	return nil
 }

@@ -105,13 +105,8 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	var session *Session
 	// create redis pool when recieve gRPC call is no reasonable in terms of speed.
 	// but we should do this becase must close connection to don't overflow block xread connection.
-	redis := my_redis.GetInstance()
-	if err := redis.CreatePool(srv.env.GetRedisAddr()); err != nil {
-		log.Printf("cant connect to redis, use directory mode: %v", err)
-		session = NewMicroserviceSessionWithFile(srv.env.GetAionHome())
-	} else {
-		session = NewMicroserviceSessionWithRedis(redis)
-	}
+	redis := my_redis.NewRedisClient(srv.env.GetRedisAddr())
+	session = NewMicroserviceSessionWithRedis(redis)
 
 	session.dataPath = srv.env.GetDataDir()
 
@@ -189,42 +184,50 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 }
 
 func parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
-	var terminated bool
-	terminated = false
-
 	switch m.MessageType {
 	case kanbanpb.RequestType_START_SERVICE:
-		p := &kanbanpb.InitializeService{}
-		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return nil, terminated, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
-		}
-		if err := session.StartKanbanWatcher(ctx, p); err != nil {
-			log.Printf("cant start kanban watcher: %v", err)
-			return nil, terminated, err
-		}
-		return nil, terminated, nil
-
+		return startService(ctx, session, m)
 	case kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN:
-		p := &kanbanpb.InitializeService{}
-		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return nil, terminated, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
-		}
-		res := session.SetKanban(p)
-		if err := session.StartKanbanWatcher(ctx, p); err != nil {
-			log.Printf("cant start kanban watcher: %v", err)
-			return nil, terminated, err
-		}
-		return res, terminated, nil
-
+		return startServiceWithoutKanban(ctx, session, m)
 	case kanbanpb.RequestType_OUTPUT_AFTER_KANBAN:
-		p := &kanbanpb.OutputRequest{}
-		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return nil, terminated, fmt.Errorf("failed unmarshal message in set next service request: %v", err)
-		}
-		res, terminated := session.OutputKanban(p)
-		return res, terminated, nil
-
-	default:
-		return nil, terminated, fmt.Errorf("message type is not defined: %s", m.MessageType)
+		return outputAfterKanban(ctx, session, m)
 	}
+	return nil, false, fmt.Errorf("message type is not defined: %s", m.MessageType)
+}
+
+func startService(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
+	terminated := false
+	p := &kanbanpb.InitializeService{}
+	if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
+		return nil, terminated, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
+	}
+	if err := session.StartKanbanWatcher(ctx, p); err != nil {
+		log.Printf("cant start kanban watcher: %v", err)
+		return nil, terminated, err
+	}
+	return nil, terminated, nil
+}
+
+func startServiceWithoutKanban(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
+	terminated := false
+	p := &kanbanpb.InitializeService{}
+	if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
+		return nil, terminated, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
+	}
+	res := session.SetKanban(p)
+	if err := session.StartKanbanWatcher(ctx, p); err != nil {
+		log.Printf("cant start kanban watcher: %v", err)
+		return nil, terminated, err
+	}
+	return res, terminated, nil
+}
+
+func outputAfterKanban(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
+	terminated := false
+	p := &kanbanpb.OutputRequest{}
+	if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
+		return nil, terminated, fmt.Errorf("failed unmarshal message in set next service request: %v", err)
+	}
+	res, terminated := session.OutputKanban(p)
+	return res, terminated, nil
 }

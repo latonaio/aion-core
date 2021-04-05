@@ -3,6 +3,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -21,32 +22,33 @@ type ConfigMap struct {
 	name        string
 	number      int
 	configMap   v1.ConfigMapInterface
-	k8s         *k8sResource
+	k8sEnv      *K8sEnv
 }
 
-func NewConfigMap(serviceName string, number int, k8s *k8sResource, targetNode string) *ConfigMap {
+func NewConfigMap(serviceName string, number int, k8sEnv *K8sEnv, targetNode string) *ConfigMap {
 	return &ConfigMap{
 		serviceName: serviceName,
-		name:        "envoy-config-" + k8s.getLabelName(serviceName, number),
+		name:        "envoy-config-" + getLabelName(serviceName, number),
 		number:      number,
-		configMap:   k8s.client.CoreV1().ConfigMaps(k8s.namespace),
-		k8s:         k8s,
+		configMap:   GetClient().CoreV1().ConfigMaps(k8sEnv.Namespace),
+		k8sEnv:      k8sEnv,
 	}
 }
 
 func (c *ConfigMap) Apply() error {
 	config, err := c.config()
+	ctx := context.Background()
 	if err != nil {
 		return fmt.Errorf("[k8s] create confg is failed: %v", err)
 	}
 
-	if _, err := c.configMap.Get(c.k8s.ctx, c.name, metaV1.GetOptions{}); err != nil {
-		if _, err := c.configMap.Create(c.k8s.ctx, config, metaV1.CreateOptions{}); err != nil {
+	if _, err := c.configMap.Get(ctx, c.name, metaV1.GetOptions{}); err != nil {
+		if _, err := c.configMap.Create(ctx, config, metaV1.CreateOptions{}); err != nil {
 			return fmt.Errorf("[k8s] create confg map is failed: %v", err)
 		}
 		log.Printf("[k8s] Created config map %s", c.name)
 	} else {
-		if _, err := c.configMap.Update(c.k8s.ctx, config, metaV1.UpdateOptions{}); err != nil {
+		if _, err := c.configMap.Update(ctx, config, metaV1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("[k8s] update config map is failed: %v", err)
 		}
 		log.Printf("[k8s] Updated config map %s", c.name)
@@ -56,12 +58,11 @@ func (c *ConfigMap) Apply() error {
 }
 
 func (c *ConfigMap) Delete() error {
-	name := "envoy-config-" + c.k8s.getLabelName(c.serviceName, c.number)
-	client := c.k8s.client.CoreV1().ConfigMaps(c.k8s.namespace)
+	name := "envoy-config-" + getLabelName(c.serviceName, c.number)
 	policy := metaV1.DeletePropagationForeground
+	ctx := context.Background()
 
-	if err := client.Delete(
-		c.k8s.ctx, name, metaV1.DeleteOptions{PropagationPolicy: &policy}); err != nil {
+	if err := c.configMap.Delete(ctx, name, metaV1.DeleteOptions{PropagationPolicy: &policy}); err != nil {
 		return fmt.Errorf("[k8s] Delete config map is failed: %v", err)
 	}
 
@@ -89,7 +90,7 @@ func (c *ConfigMap) config() (*apiV1.ConfigMap, error) {
 	return &apiV1.ConfigMap{
 		ObjectMeta: metaV1.ObjectMeta{
 			Name:      c.name,
-			Namespace: c.k8s.namespace,
+			Namespace: c.k8sEnv.Namespace,
 		},
 		Data: map[string]string{
 			"envoy.yaml": strConf,

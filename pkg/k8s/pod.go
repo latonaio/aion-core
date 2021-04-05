@@ -30,16 +30,16 @@ type Pod struct {
 	volumeMountPathList []string
 	serviceAccount      string
 	privileged          bool
-	k8s                 *k8sResource
+	k8sEnv              *K8sEnv
 	TargetNode          string
 }
 
 func NewPod(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Pod {
+	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string) *Pod {
 
 	return &Pod{
-		name:                k8s.getLabelName(serviceName, number),
+		name:                getLabelName(serviceName, number),
 		serviceName:         serviceName,
 		tag:                 tag,
 		number:              number,
@@ -49,7 +49,7 @@ func NewPod(
 		volumeMountPathList: volumeMountPathList,
 		serviceAccount:      serviceAccount,
 		privileged:          privileged,
-		k8s:                 k8s,
+		k8sEnv:              k8sEnv,
 		TargetNode:          targetNode,
 	}
 }
@@ -57,7 +57,7 @@ func NewPod(
 func (p *Pod) config() apiV1.PodTemplateSpec {
 	return apiV1.PodTemplateSpec{
 		ObjectMeta: metaV1.ObjectMeta{
-			Labels: p.k8s.getLabelMap(p.serviceName, p.number),
+			Labels: getLabelMap(p.serviceName, p.number),
 		},
 		Spec: apiV1.PodSpec{
 			Hostname:              p.name,
@@ -65,7 +65,7 @@ func (p *Pod) config() apiV1.PodTemplateSpec {
 			ServiceAccountName:    p.serviceAccount,
 			ImagePullSecrets: []apiV1.LocalObjectReference{
 				{
-					Name: p.k8s.registrySecret,
+					Name: p.k8sEnv.RegistrySecret,
 				},
 			},
 			Containers: []apiV1.Container{
@@ -81,7 +81,7 @@ func (p *Pod) config() apiV1.PodTemplateSpec {
 func (p *Pod) getContainer() apiV1.Container {
 	return apiV1.Container{
 		Name:            p.name,
-		Image:           p.k8s.repositoryPrefix + "/" + p.serviceName + ":" + p.tag,
+		Image:           p.k8sEnv.RepositoryPrefix + "/" + p.serviceName + ":" + p.tag,
 		ImagePullPolicy: apiV1.PullIfNotPresent,
 		Command:         p.command,
 		SecurityContext: &apiV1.SecurityContext{
@@ -96,7 +96,7 @@ func (p *Pod) getContainer() apiV1.Container {
 func (p *Pod) getEnvoyContainer() apiV1.Container {
 	return apiV1.Container{
 		Name:  "envoy",
-		Image: p.k8s.repositoryPrefix + "/envoy:latest",
+		Image: p.k8sEnv.RepositoryPrefix + "/envoy:latest",
 		Command: []string{
 			"/usr/local/bin/envoy",
 		},
@@ -167,7 +167,7 @@ func (p *Pod) getVolumeMountList() []apiV1.VolumeMount {
 
 	volumeMountList = append(volumeMountList, apiV1.VolumeMount{
 		Name:      "aion-data",
-		MountPath: p.k8s.aionDataPath,
+		MountPath: p.k8sEnv.AionDataPath,
 	})
 
 	for key, value := range p.volumeMountPathList {
@@ -206,7 +206,7 @@ func (p *Pod) getVolumeList() []apiV1.Volume {
 			VolumeSource: apiV1.VolumeSource{
 				ConfigMap: &apiV1.ConfigMapVolumeSource{
 					LocalObjectReference: apiV1.LocalObjectReference{
-						Name: "envoy-config-" + p.k8s.getLabelName(p.serviceName, p.number),
+						Name: "envoy-config-" + getLabelName(p.serviceName, p.number),
 					},
 				},
 			},
@@ -231,11 +231,11 @@ func (p *Pod) getVolumeList() []apiV1.Volume {
 }
 
 func (p *Pod) getHostAionDataPath() string {
-	dataPathList := strings.Split(p.k8s.aionDataPath, "/")
+	dataPathList := strings.Split(p.k8sEnv.AionDataPath, "/")
 	hostDataPath := ""
 	for i, path := range dataPathList {
 		if len(dataPathList)-1 == i {
-			hostDataPath += p.k8s.namespace + "/"
+			hostDataPath += p.k8sEnv.Namespace + "/"
 		}
 		hostDataPath += path + "/"
 	}

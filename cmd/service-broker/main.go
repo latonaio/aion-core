@@ -43,14 +43,14 @@ func main() {
 	log.Debugln("debug aion chan <- done ")
 	if env.IsDocker() {
 		log.Printf("Use docker mode")
-		if err := k8s.New(
-			ctx, env.GetDataDir(), env.GetRepositoryPrefix(), env.GetNamespace(), env.GetRegistrySecret()); err != nil {
+		if err := k8s.PodsWatcher(ctx); err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	// service deploy　controller
-	msc, err := app.StartMicroservicesController(ctx, env, aionCh)
+	redis := my_redis.NewRedisClient(env.GetRedisAddr())
+	msc, err := app.StartMicroservicesController(ctx, env, aionCh, redis)
 	if err != nil {
 		log.Fatalf("cant start microservice controller: %v", err)
 	}
@@ -61,12 +61,8 @@ func main() {
 		workerStatusMonitoringCh := make(chan map[string]map[string]bool)
 		log.Println("start ServiceBroker MasterServer ")
 		// start grpc server
-		go masterServer(workerStatusMonitoringCh, env)
+		go masterServer(workerStatusMonitoringCh, env, redis)
 		// start worker status monitor
-		redis := my_redis.GetInstance()
-		if err := redis.CreatePool(env.GetRedisAddr()); err != nil {
-			log.Warnf("cant connect to redis, use directory mode: %v", err)
-		}
 		go app.NewWorkerStatusMonitor(workerStatusMonitoringCh, redis).Start()
 	case app.WorkerMode:
 		// start grpc client
@@ -85,7 +81,7 @@ func main() {
 	}
 }
 
-func masterServer(workerStatusMonitoringCh chan<- map[string]map[string]bool, env *app.Config) {
+func masterServer(workerStatusMonitoringCh chan<- map[string]map[string]bool, env *app.Config, redis *my_redis.RedisClient) {
 	sendAionSettingToWorkerCh := make(chan *config.AionSetting, 1)
 	lis, err := net.Listen("tcp", ":11111")
 	if err != nil {
@@ -94,7 +90,7 @@ func masterServer(workerStatusMonitoringCh chan<- map[string]map[string]bool, en
 
 	s := grpc.NewServer()
 	ww := services.NewWorkerWatcher(workerStatusMonitoringCh)
-	server := &services.ProjectServer{AionCh: sendAionSettingToWorkerCh, IsDocker: env.IsDocker()}
+	server := services.NewProjectServer(sendAionSettingToWorkerCh, env.IsDocker(), redis)
 	clspb.RegisterClusterServer(s, ww)
 	pjpb.RegisterProjectServer(s, server)
 

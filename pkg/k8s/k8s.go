@@ -16,59 +16,60 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var k8sResourceInstance = &k8sResource{}
+var k8sClient *kubernetes.Clientset = func() *kubernetes.Clientset {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatalf("cannot get config: %v\n", err)
+	}
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("cannot get client: %v\n", err)
+	}
+	return client
+}()
 
 type K8sResource interface {
 	Apply() error
 	Delete() error
 }
 
-type k8sResource struct {
-	ctx              context.Context
-	client           *kubernetes.Clientset
-	aionDataPath     string
-	repositoryPrefix string
-	namespace        string
-	registrySecret   string
+type K8sEnv struct {
+	AionDataPath     string
+	RepositoryPrefix string
+	Namespace        string
+	RegistrySecret   string
 }
 
-type EnvHomeConf struct {
-	Home string `envconfig:"HOME"`
-}
-
-func New(ctx context.Context, aionDataPath string, repositoryPrefix string, namespace string, registrySecret string) error {
+func newClient() (*kubernetes.Clientset, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	k8sResourceInstance = &k8sResource{
-		client:           client,
-		ctx:              ctx,
-		aionDataPath:     aionDataPath,
-		repositoryPrefix: repositoryPrefix,
-		namespace:        namespace,
-		registrySecret:   registrySecret,
-	}
-	// start pods watcher
-	if err := k8sResourceInstance.PodsWatcher(); err != nil {
-		return err
-	}
-
-	return nil
+	return client, nil
 }
 
-func Get() *k8sResource {
-	return k8sResourceInstance
+func GetClient() *kubernetes.Clientset {
+	return k8sClient
 }
 
-func (k *k8sResource) PodsWatcher() error {
+func NewK8sEnv(aionDataPath string, repositoryPrefix string, namespace string, registrySecret string) *K8sEnv {
+	return &K8sEnv{
+		AionDataPath:     aionDataPath,
+		RepositoryPrefix: repositoryPrefix,
+		Namespace:        namespace,
+		RegistrySecret:   registrySecret,
+	}
+}
+
+func PodsWatcher(ctx context.Context) error {
+	client := GetClient()
+
 	listenerWatcher := cache.NewListWatchFromClient(
-		k.client.CoreV1().RESTClient(), string(apiV1.ResourcePods), apiV1.NamespaceAll, fields.Everything())
+		client.CoreV1().RESTClient(), string(apiV1.ResourcePods), apiV1.NamespaceAll, fields.Everything())
 
 	var _, watcher = cache.NewInformer(
 		listenerWatcher, &apiV1.Pod{}, 0,
@@ -86,7 +87,7 @@ func (k *k8sResource) PodsWatcher() error {
 
 	stopCh := make(chan struct{})
 	go func() {
-		<-k.ctx.Done()
+		<-ctx.Done()
 		close(stopCh)
 	}()
 	go watcher.Run(stopCh)
@@ -96,28 +97,28 @@ func (k *k8sResource) PodsWatcher() error {
 func int32Ptr(i int32) *int32 { return &i }
 func boolPrt(b bool) *bool    { return &b }
 
-func (k *k8sResource) getLabelName(serviceName string, number int) string {
+func getLabelName(serviceName string, number int) string {
 	t := strings.Split(serviceName, "/")
 	t = strings.Split(t[len(t)-1], ":")
 	return fmt.Sprintf("%s-%03d", t[0], number)
 }
 
-func (k *k8sResource) getLabelNameWithoutTargetNode(serviceName string, number int) string {
+func getLabelNameWithoutTargetNode(serviceName string, number int) string {
 	t := strings.Split(serviceName, "/")
 	t = strings.Split(t[len(t)-1], ":")
 	return fmt.Sprintf("%s-%03d", t[0], number)
 }
 
-func (k *k8sResource) getLabelMap(serviceName string, number int) map[string]string {
+func getLabelMap(serviceName string, number int) map[string]string {
 	return map[string]string{
-		"run": k.getLabelNameWithoutTargetNode(serviceName, number),
+		"run": getLabelNameWithoutTargetNode(serviceName, number),
 	}
 }
 
-func (k *k8sResource) getObjectMeta(serviceName string, number int, targetNode string) metaV1.ObjectMeta {
+func getObjectMeta(namespace string, serviceName string, number int, targetNode string) metaV1.ObjectMeta {
 	return metaV1.ObjectMeta{
-		Labels:    k.getLabelMap(serviceName, number),
-		Name:      k.getLabelName(serviceName, number),
-		Namespace: k.namespace,
+		Labels:    getLabelMap(serviceName, number),
+		Name:      getLabelName(serviceName, number),
+		Namespace: namespace,
 	}
 }

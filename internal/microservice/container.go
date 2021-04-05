@@ -15,7 +15,7 @@ type ContainerMicroservice struct {
 	Service   *k8s.Service
 }
 
-func NewContainerMicroservice(msName string, data *config.Microservice, msNum int) Container {
+func NewContainerMicroservice(k8sEnv *k8s.K8sEnv, msName string, data *config.Microservice, msNum int) Container {
 	var k k8s.K8sResource
 	env := make(map[string]string)
 	for k, v := range data.Env {
@@ -33,7 +33,7 @@ func NewContainerMicroservice(msName string, data *config.Microservice, msNum in
 			data.VolumeMountPathList,
 			data.ServiceAccount,
 			data.Privileged,
-			k8s.Get(),
+			k8sEnv,
 			data.TargetNode,
 		)
 	} else {
@@ -47,15 +47,15 @@ func NewContainerMicroservice(msName string, data *config.Microservice, msNum in
 			data.VolumeMountPathList,
 			data.ServiceAccount,
 			data.Privileged,
-			k8s.Get(),
+			k8sEnv,
 			data.TargetNode,
 		)
 	}
 
 	return &ContainerMicroservice{
 		K8s:       k,
-		ConfigMap: k8s.NewConfigMap(msName, msNum, k8s.Get(), data.TargetNode),
-		Service:   k8s.NewService(msName, msNum, data.Ports, data.Network, k8s.Get()),
+		ConfigMap: k8s.NewConfigMap(msName, msNum, k8sEnv, data.TargetNode),
+		Service:   k8s.NewService(msName, msNum, data.Ports, data.Network, k8sEnv),
 	}
 }
 

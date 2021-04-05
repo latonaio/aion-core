@@ -10,15 +10,25 @@ import (
 	pb "bitbucket.org/latonaio/aion-core/proto/projectpb"
 )
 
-type ProjectServer struct {
+type projectServer struct {
 	sync.Mutex
 	pb.UnimplementedProjectServer
 	AionCh   chan<- *config.AionSetting
 	IsDocker bool
 	prj      *pb.AionSetting
+	redis    *my_redis.RedisClient
 }
 
-func (p *ProjectServer) Apply(ctx context.Context, receivedAionSetting *pb.AionSetting) (*pb.Response, error) {
+func NewProjectServer(aionCh chan<- *config.AionSetting, isDocker bool, redis *my_redis.RedisClient) *projectServer {
+	return &projectServer{
+		AionCh:   aionCh,
+		IsDocker: isDocker,
+		prj:      nil,
+		redis:    redis,
+	}
+}
+
+func (p *projectServer) Apply(ctx context.Context, receivedAionSetting *pb.AionSetting) (*pb.Response, error) {
 	log.Debugf("[grpc][server][received] AionSetting: %+v", receivedAionSetting)
 	p.Lock()
 	p.prj = receivedAionSetting
@@ -40,7 +50,7 @@ func (p *ProjectServer) Apply(ctx context.Context, receivedAionSetting *pb.AionS
 	}, nil
 }
 
-func (p *ProjectServer) Delete(ctx context.Context, prj *pb.AionSetting) (*pb.Response, error) {
+func (p *projectServer) Delete(ctx context.Context, prj *pb.AionSetting) (*pb.Response, error) {
 	log.Printf("received aionSetting")
 
 	for i, _ := range prj.Microservices {
@@ -65,12 +75,8 @@ func (p *ProjectServer) Delete(ctx context.Context, prj *pb.AionSetting) (*pb.Re
 	}, nil
 }
 
-func (p *ProjectServer) Status(context.Context, *pb.Empty) (*pb.Services, error) {
-	rdsCon := my_redis.GetInstance()
-	if err := rdsCon.CreatePool("redis-cluster"); err != nil {
-		log.Warnf("cant connect to redis, use directory mode: %v", err)
-	}
-	result, err := rdsCon.HGet("aion-cluster-status")
+func (p *projectServer) Status(context.Context, *pb.Empty) (*pb.Services, error) {
+	result, err := p.redis.HGet("aion-cluster-status")
 	if err != nil {
 		log.Printf("[WorkerMonitor][GetAllServicesStatus] failed cause: %v", err)
 		return &pb.Services{

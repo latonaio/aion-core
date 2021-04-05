@@ -17,13 +17,8 @@ type Client struct {
 }
 
 // connect to redis server and start grpc server
-func NewClient(ctx context.Context, conf *Config) *Client {
+func NewClient(ctx context.Context, conf *Config, redis *my_redis.RedisClient) *Client {
 	// create redis pool
-	redis := my_redis.GetInstance()
-	if err := redis.CreatePool(conf.GetRedisAddr()); err != nil {
-		log.Fatalf("cant connect to redis, exit kanban-replicator: %v", err)
-	}
-
 	// create mongo pool
 	if err := my_mongo.GetInstance().CreatePool(ctx, conf.GetMongoAddr(), conf.GetKanbanDB(), conf.GetKanbanCollection()); err != nil {
 		log.Fatalf("cant connect to mongo, exit kanban-replicator: %v", err)

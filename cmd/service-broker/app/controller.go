@@ -11,6 +11,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/internal/devices"
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/internal/microservice"
+	"bitbucket.org/latonaio/aion-core/pkg/k8s"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 )
@@ -27,6 +28,7 @@ type controller struct {
 	microservicesStatus map[string]bool
 	updateTrigger       chan map[string]bool
 	config              *Config
+	k8sEnv              *k8s.K8sEnv
 }
 
 func (msc *controller) setMicroserviceList() error {
@@ -56,7 +58,7 @@ func (msc *controller) setMicroserviceList() error {
 }
 
 func (msc *controller) setMicroservice(msName string, msData *config.Microservice) error {
-	sc, err := microservice.NewScaleContainer(msc.aionHome, msName, msData)
+	sc, err := microservice.NewScaleContainer(msc.k8sEnv, msc.aionHome, msName, msData)
 	if err != nil {
 		return err
 	}
@@ -203,19 +205,12 @@ func (msc *controller) WatchKanbanForMicroservice(ctx context.Context, aionCh <-
 	}
 }
 
-func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-chan *config.AionSetting) (*controller, error) {
+func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-chan *config.AionSetting, redis *my_redis.RedisClient) (*controller, error) {
 	// kanban use redis or file
 	var adapter kanban.Adapter
-	redis := my_redis.GetInstance()
-	if err := redis.CreatePool(env.GetRedisAddr()); err != nil {
-		log.Warnf("cant connect to redis, use directory mode: %v", err)
-		adapter = kanban.NewFileAdapter(env.GetDataDir())
-	} else {
-		log.Printf("Use redis mode")
-		adapter = kanban.NewRedisAdapter(redis)
-		if err := redis.FlushAll(); err != nil {
-			log.Errorf("cant initialized redis: %v", err)
-		}
+	adapter = kanban.NewRedisAdapter(redis)
+	if err := redis.FlushAll(); err != nil {
+		log.Errorf("cant initialized redis: %v", err)
 	}
 
 	dc, err := devices.NewDeviceController(ctx, env.IsDocker())
@@ -223,6 +218,7 @@ func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-cha
 		return nil, err
 	}
 	// start to watch result about previous microservice
+	k8sEnv := k8s.NewK8sEnv(env.GetDataDir(), env.GetRepositoryPrefix(), env.GetNamespace(), env.GetRegistrySecret())
 	msc := &controller{
 		aionHome:            env.GetAionHome(),
 		microserviceList:    make(map[string]*microservice.ScaleContainer),
@@ -231,6 +227,7 @@ func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-cha
 		watcher:             NewWatcher(dc, adapter),
 		updateTrigger:       make(chan map[string]bool, 1),
 		config:              env,
+		k8sEnv:              k8sEnv,
 	}
 
 	aionChForWatcher := make(chan *config.AionSetting)

@@ -11,16 +11,16 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 )
 
+const initPrevID = "0"
+
 func NewRedisAdapter(redis *my_redis.RedisClient) Adapter {
 	return &RedisAdaptor{
-		redis:  redis,
-		prevID: "0",
+		redis: redis,
 	}
 }
 
 type RedisAdaptor struct {
-	redis  *my_redis.RedisClient
-	prevID string
+	redis *my_redis.RedisClient
 }
 
 func getBeforeStreamKey(msName string, number int) string {
@@ -80,23 +80,24 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanp
 		log.Printf("[watch kanban] stop watch kanban %s:%d", msName, msNumber)
 	}()
 
+	prevID := initPrevID
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 	ch := make(chan *kanbanpb.StatusKanban)
 	go func() {
 		for {
-			hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{a.prevID}, 1, 0)
+			hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{prevID}, 1, 0)
 			if err != nil {
 				log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
 				close(ch)
 				return
 			}
 			if deleteOldKanban {
-				log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, a.prevID)
-				if err := a.redis.XDel(streamKey, []string{a.prevID}); err != nil {
-					log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, a.prevID)
+				log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, prevID)
+				if err := a.redis.XDel(streamKey, []string{prevID}); err != nil {
+					log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, prevID)
 				}
 			}
-			a.prevID = nextID
+			prevID = nextID
 			k, err := unmarshalKanban(hash)
 			if err != nil {
 				log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
