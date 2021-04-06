@@ -163,6 +163,10 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) (*kanbanpb.Response, b
 	afterKanban.ProcessNumber = p.ProcessNumber
 	afterKanban.ConnectionKey = p.ConnectionKey
 
+	for _, v := range afterKanban.Services {
+		v.Device = p.DeviceName
+	}
+
 	// write after kanban
 	s.cacheKanban.StartAt = common.GetIsoDatetime()
 	if err := s.io.WriteKanban(s.microserviceName, s.processNumber, afterKanban, kanban.StatusType_After); err != nil {
