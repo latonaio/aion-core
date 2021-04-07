@@ -53,16 +53,16 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 
 func (w *Watcher) WriteKanbanMongo(ctx context.Context, kanban *kanbanpb.StatusKanban, streamKey string) error {
 	val := map[string]interface{}{
-		"streamKey":     streamKey,
-		"startAt":       kanban.StartAt,
-		"finishAt":      kanban.FinishAt,
-		"services":      kanban.Services,
-		"connectionKey": kanban.ConnectionKey,
-		"processNumber": kanban.ProcessNumber,
-		"priorSuccess":  kanban.PriorSuccess,
-		"dataPath":      kanban.DataPath,
-		"fileList":      kanban.FileList,
-		"metadata":      unpackStruct(kanban.Metadata),
+		"streamKey":      streamKey,
+		"startAt":        kanban.StartAt,
+		"finishAt":       kanban.FinishAt,
+		"nextDeviceName": kanban.NextDeviceName,
+		"connectionKey":  kanban.ConnectionKey,
+		"processNumber":  kanban.ProcessNumber,
+		"priorSuccess":   kanban.PriorSuccess,
+		"dataPath":       kanban.DataPath,
+		"fileList":       kanban.FileList,
+		"metadata":       unpackStruct(kanban.Metadata),
 	}
 
 	if err := my_mongo.GetInstance().InsertOne(ctx, val); err != nil {

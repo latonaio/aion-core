@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -183,51 +182,31 @@ func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServe
 	}
 }
 
-func parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
-	switch m.MessageType {
-	case kanbanpb.RequestType_START_SERVICE:
-		return startService(ctx, session, m)
-	case kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN:
-		return startServiceWithoutKanban(ctx, session, m)
-	case kanbanpb.RequestType_OUTPUT_AFTER_KANBAN:
-		return outputAfterKanban(ctx, session, m)
+func parseRequestMessage(ctx context.Context, session *Session, req *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
+	message := req.GetRequestMessage()
+	switch t := message.(type) {
+	case *kanbanpb.Request_InitMessage:
+		return startService(ctx, session, t.InitMessage)
+	case *kanbanpb.Request_Message:
+		return outputAfterKanban(ctx, session, t.Message)
 	}
-	return nil, false, fmt.Errorf("message type is not defined: %s", m.MessageType)
+	return nil, false, fmt.Errorf("message type is not defined")
 }
 
-func startService(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
-	terminated := false
-	p := &kanbanpb.InitializeService{}
-	if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-		return nil, terminated, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
+func startService(ctx context.Context, session *Session, m *kanbanpb.InitializeService) (*kanbanpb.Response, bool, error) {
+	var res *kanbanpb.Response = nil
+	if m.InitType == kanbanpb.InitializeType_START_SERVICE_WITHOUT_KANBAN {
+		res = session.SetKanban(m)
 	}
-	if err := session.StartKanbanWatcher(ctx, p); err != nil {
+	if err := session.StartKanbanWatcher(ctx, m); err != nil {
 		log.Printf("cant start kanban watcher: %v", err)
-		return nil, terminated, err
+		return nil, false, err
 	}
-	return nil, terminated, nil
+	return res, false, nil
 }
 
-func startServiceWithoutKanban(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
+func outputAfterKanban(ctx context.Context, session *Session, m *kanbanpb.StatusKanban) (*kanbanpb.Response, bool, error) {
 	terminated := false
-	p := &kanbanpb.InitializeService{}
-	if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-		return nil, terminated, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
-	}
-	res := session.SetKanban(p)
-	if err := session.StartKanbanWatcher(ctx, p); err != nil {
-		log.Printf("cant start kanban watcher: %v", err)
-		return nil, terminated, err
-	}
-	return res, terminated, nil
-}
-
-func outputAfterKanban(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, bool, error) {
-	terminated := false
-	p := &kanbanpb.OutputRequest{}
-	if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-		return nil, terminated, fmt.Errorf("failed unmarshal message in set next service request: %v", err)
-	}
-	res, terminated := session.OutputKanban(p)
+	res, terminated := session.OutputKanban(m)
 	return res, terminated, nil
 }

@@ -45,6 +45,7 @@ type YamlMicroservice struct {
 	Privileged          bool                          `yaml:",omitempty"`
 	WithoutKanban       bool                          `yaml:"withoutKanban,omitempty"`
 	TargetNode          string                        `yaml:"targetNode,omitempty"`
+	Resources           *YamlResources                `yaml:",omitempty"`
 }
 
 type YamlPortConfig struct {
@@ -58,6 +59,16 @@ type YamlNextService struct {
 	NextServiceName string `yaml:"name,omitempty"`
 	NumberPattern   string `yaml:"pattern,omitempty"`
 	NextDevice      string `yaml:"device,omitempty"`
+}
+
+type YamlResources struct {
+	Requests *YamlResourceConfig `yaml:",omitempty"`
+	Limits   *YamlResourceConfig `yaml:",omitempty"`
+}
+
+type YamlResourceConfig struct {
+	Memory string `yaml:",omitempty"`
+	Cpu    string `yaml:",omitempty"`
 }
 
 func LoadConfigFromFile(filePath string) (*projectpb.AionSetting, error) {

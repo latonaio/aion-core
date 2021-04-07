@@ -11,7 +11,6 @@ import (
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
-	"github.com/golang/protobuf/ptypes"
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -82,9 +81,6 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 	go s.io.WatchKanban(childCtx, ch, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
 
 	go func() {
-		currentServiceData := &kanbanpb.ServiceData{
-			Name: s.microserviceName,
-		}
 		for {
 			select {
 			case <-ctx.Done():
@@ -97,15 +93,10 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 					cancel()
 					return
 				}
-				anyMsg, err := ptypes.MarshalAny(kanban)
-				if err != nil {
-					log.Printf("[kanban Watcher] cant unmarchal status kanban to any message")
-				}
 				s.cacheKanban = kanban
-				s.cacheKanban.Services = append(s.cacheKanban.Services, currentServiceData)
 				res := &kanbanpb.Response{
 					MessageType: kanbanpb.ResponseType_RES_CACHE_KANBAN,
-					Message:     anyMsg,
+					Message:     kanban,
 				}
 				log.Printf("[KanbanWatcher] success to read kanban: (ms:%s, number:%d)",
 					s.microserviceName, s.processNumber)
@@ -120,13 +111,10 @@ func (s *Session) StartKanbanWatcher(ctx context.Context, p *kanbanpb.Initialize
 
 // set kanban from microservice
 func (s *Session) SetKanban(p *kanbanpb.InitializeService) *kanbanpb.Response {
-	res := &kanbanpb.Response{}
-	res.MessageType = kanbanpb.ResponseType_RES_CACHE_KANBAN
 	// get cache kanban
 	s.cacheKanban = &kanbanpb.StatusKanban{
 		StartAt:       common.GetIsoDatetime(),
 		FinishAt:      "",
-		Services:      []*kanbanpb.ServiceData{{Name: s.microserviceName}},
 		ConnectionKey: "",
 		ProcessNumber: p.ProcessNumber,
 		DataPath:      common.GetMsDataPath(s.dataPath, p.MicroserviceName, int(p.ProcessNumber)),
@@ -135,17 +123,15 @@ func (s *Session) SetKanban(p *kanbanpb.InitializeService) *kanbanpb.Response {
 	s.microserviceName = p.MicroserviceName
 	s.processNumber = int(p.ProcessNumber)
 
-	msg, err := ptypes.MarshalAny(s.cacheKanban)
-	if err != nil {
-		res.Error = err.Error()
-		return res
+	res := &kanbanpb.Response{
+		MessageType: kanbanpb.ResponseType_RES_CACHE_KANBAN,
+		Message:     s.cacheKanban,
 	}
-	res.Message = msg
 	return res
 }
 
 // set next service yaml to output kanban
-func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) (*kanbanpb.Response, bool) {
+func (s *Session) OutputKanban(p *kanbanpb.StatusKanban) (*kanbanpb.Response, bool) {
 	res := &kanbanpb.Response{}
 	res.MessageType = kanbanpb.ResponseType_RES_REQUEST_RESULT
 	// check that already set microservice name
@@ -162,10 +148,7 @@ func (s *Session) OutputKanban(p *kanbanpb.OutputRequest) (*kanbanpb.Response, b
 	afterKanban.Metadata = p.Metadata
 	afterKanban.ProcessNumber = p.ProcessNumber
 	afterKanban.ConnectionKey = p.ConnectionKey
-
-	for _, v := range afterKanban.Services {
-		v.Device = p.DeviceName
-	}
+	afterKanban.NextDeviceName = p.NextDeviceName
 
 	// write after kanban
 	s.cacheKanban.StartAt = common.GetIsoDatetime()

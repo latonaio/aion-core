@@ -19,18 +19,13 @@ service SendAnything {
 message StatusKanban {
     string startAt = 1;
     string finishAt = 2;
-    repeated ServiceData services = 3;
+    string nextDeviceName = 3;
     string connectionKey = 4;
     int32 processNumber = 5;
     bool priorSuccess = 6;
     string dataPath = 7;
     repeated string fileList = 8;
     google.protobuf.Struct metadata = 9;
-}
-
-message ServiceData {
-    string name = 1;
-    string device = 2;
 }
 
 // --------------------- Send Anything Server --------------------------
@@ -75,31 +70,14 @@ message UploadStatus {
 // --------------------- Status Kanban Server ---------------------------
 // サービス起動時通知
 message InitializeService {
-    string microserviceName = 1;
-    int32 processNumber = 2;
+    InitializeType initType = 1;
+    string microserviceName = 2;
+    int32 processNumber = 3;
 }
 
-// サービス起動時通知（マイクロサービからカンバン取得[for debug] )
-message InitializeServiceWithKanban{
-    string microserviceName = 1;
-    StatusKanban cacheKanban = 2;
-}
-
-// microserviceの実行結果
-message OutputRequest {
-    bool priorSuccess = 1;
-    string dataPath = 2;
-    string connectionKey = 3;
-    int32 processNumber = 4;
-    repeated string fileList = 5;
-    google.protobuf.Struct metadata = 6;
-    string deviceName = 7;
-}
-
-enum RequestType {
+enum InitializeType {
     START_SERVICE = 0;
     START_SERVICE_WITHOUT_KANBAN = 1;
-    OUTPUT_AFTER_KANBAN = 2;
 }
 
 enum ResponseType {
@@ -108,12 +86,14 @@ enum ResponseType {
 }
 
 message Request {
-    RequestType messageType = 1;
-    google.protobuf.Any message = 2;
+    oneof requestMessage {
+        StatusKanban message = 2;
+        InitializeService initMessage = 3;
+    }
 }
 
 message Response {
     ResponseType messageType = 1;
-    google.protobuf.Any message = 2;
+    StatusKanban message = 2;
     string error = 3;
 }

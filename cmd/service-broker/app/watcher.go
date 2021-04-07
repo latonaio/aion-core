@@ -104,7 +104,7 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 			}
 			for _, nextService := range nextServiceList {
 				number := config.GetNextNumber(k.ProcessNumber, nextService.NumberPattern)
-				nextDeviceName := k.Services[len(k.Services)-1].Device
+				nextDeviceName := k.NextDeviceName
 				if nextDeviceName == "" {
 					nextDeviceName = nextService.NextDevice
 				}
@@ -113,7 +113,7 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 					w.deviceController.SendFileToDevice(nextDeviceName, k, nextService.NextServiceName, number, device.Addr)
 				} else {
 					// send to local microservice
-					k.Services[len(k.Services)-1].Device = w.aionSetting.GetDeviceName()
+					k.NextDeviceName = w.aionSetting.GetDeviceName()
 					if err := w.WriteKanban(nextService.NextServiceName, number, k, kanban.StatusType_Before); err != nil {
 						log.Errorf("[watcher: start microservice] %v", err)
 					}
