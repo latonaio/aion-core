@@ -41,6 +41,7 @@ message SendKanban {
 message Chunk {
     bytes context = 1;
     string name = 2;
+    int32 refNum = 3;
 }
 
 enum UploadRequestCode {

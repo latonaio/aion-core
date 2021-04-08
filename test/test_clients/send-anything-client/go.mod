@@ -1,9 +1,9 @@
-module aion-watchdog-kube
+module aion-send-test-kube
 
 go 1.15
 
 require (
-	bitbucket.org/latonaio/aion-core v0.9.3
+	bitbucket.org/latonaio/aion-core v0.9.6
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0

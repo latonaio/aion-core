@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"runtime"
 	"sync"
 	"syscall"
 
@@ -24,53 +25,56 @@ var countList = sync.Pool{
 }
 
 func main() {
-	errCh := make(chan error, 1)
 	quiteCh := make(chan syscall.Signal, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c, err := msclient.NewKanbanClient(ctx, msName)
+	errStop(err)
 
-	c, err := msclient.NewKanbanClient(ctx)
-	if err != nil {
-		errCh <- err
-	}
-
-	_, err = c.SetKanban(msName, c.GetProcessNumber())
-	if err != nil {
-		errCh <- err
-	}
+	_, err = c.SetKanban()
+	errStop(err)
 
 	addDevName := msclient.Option(
-		func(d *kanbanpb.OutputRequest) error {
+		func(d *kanbanpb.StatusKanban) error {
 			d.NextDeviceName = "pluto"
 			return nil
 		},
 	)
 	addSendDataPath := msclient.Option(
-		func(d *kanbanpb.OutputRequest) error {
-			d.FileList = []string{"sendData/testData.png"}
+		func(d *kanbanpb.StatusKanban) error {
+			if d.FileList == nil {
+				d.FileList = make([]string, 0, 1)
+			}
+			d.FileList = append(d.FileList, "sendData/sendfile.txt")
 			return nil
 		},
 	)
 	ck := msclient.SetConnectionKey("slack")
 	req, err := msclient.NewOutputData(ck, addDevName, addSendDataPath)
-	if err != nil {
-		errCh <- err
-		return
-	}
+	errStop(err)
+
 	err = c.OutputKanban(req)
-	if err != nil {
-		errCh <- err
+	errStop(err)
+
+	successStop()
+	<-quiteCh
+	cancel()
+	return
+}
+
+func errStop(err error) {
+	if err == nil {
 		return
 	}
 
-loop:
+	_, f, l, _ := runtime.Caller(1)
+	log.Printf("ERROR in %s:%d", f, l)
+	log.Printf("Process is alive and waiting. err -----")
+	log.Printf("%v", err)
 	for {
-		select {
-		case err := <-errCh:
-			log.Print(err)
-			break loop
-		case <-quiteCh:
-			cancel()
-		}
 	}
+}
+
+func successStop() {
+	log.Printf("Success. process is alive and waiting.")
 }

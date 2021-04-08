@@ -13,9 +13,9 @@ import (
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"github.com/avast/retry-go"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func sendToServerNotifyFailure(stream kanbanpb.SendAnything_SendToOtherDevicesClient) error {
@@ -81,6 +81,18 @@ func sendToOtherDeviceClient(ctx context.Context, m *kanbanpb.SendKanban, port i
 		log.Printf("[SendToOtherDevice client] success to send kanban and files: %s", deviceAddr)
 	}()
 
+	eachFileStatus, isAllOK := filesExists(m.AfterKanban.FileList)
+
+	if !isAllOK {
+		invalidFilePaths := make([]string, 0, len(eachFileStatus))
+		for i, ok := range eachFileStatus {
+			if !ok {
+				invalidFilePaths = append(invalidFilePaths, m.AfterKanban.FileList[i])
+			}
+		}
+		return errors.Errorf("cannot open file(s) %v", invalidFilePaths)
+	}
+
 	// send kanban and files
 	if err := sendKanban(stream, m); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("[SendToOtherDevice client] sending kanban is failed: %s", deviceAddr))
@@ -91,13 +103,29 @@ func sendToOtherDeviceClient(ctx context.Context, m *kanbanpb.SendKanban, port i
 	if err := sendEos(stream); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("[SendToOtherDevice client] sending eos is failed: %s", deviceAddr))
 	}
+
 	return nil
+}
+
+func filesExists(filePaths []string) ([]bool, bool) {
+	existStatus := make([]bool, 0, len(filePaths))
+	allOK := true
+
+	for _, path := range filePaths {
+		thisFile := fileExists(path)
+		existStatus = append(existStatus, thisFile)
+
+		if allOK && !thisFile {
+			allOK = false
+		}
+	}
+	return existStatus, allOK
 }
 
 // send kanban to other devices
 func sendKanban(stream kanbanpb.SendAnything_SendToOtherDevicesClient, m *kanbanpb.SendKanban) error {
 	log.Printf("[SendToOtherDevices client] start to send kanban: %s", m.NextService)
-	cont, err := ptypes.MarshalAny(m)
+	cont, err := anypb.New(m)
 	if err != nil {
 		return err
 	}
@@ -130,7 +158,7 @@ func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, fileName st
 	}
 	defer f.Close()
 
-	for {
+	for cnt := int32(0); true; cnt++ {
 		var req *kanbanpb.SendContext
 		chunk := make([]byte, chunkSize)
 		count, err := f.Read(chunk)
@@ -147,9 +175,10 @@ func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, fileName st
 			}
 			break
 		}
-		anyChunk, err := ptypes.MarshalAny(&kanbanpb.Chunk{
+		anyChunk, err := anypb.New(&kanbanpb.Chunk{
 			Context: chunk[:count],
 			Name:    fileName,
+			RefNum:  cnt,
 		})
 		if err != nil {
 			return sendToServerNotifyFailure(stream)

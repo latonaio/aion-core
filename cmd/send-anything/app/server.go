@@ -18,6 +18,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // chunk size (128kB)
@@ -154,6 +155,7 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 	// received message var
 	kContainer := &kanbanpb.SendKanban{}
 	chunk := &kanbanpb.Chunk{}
+	nextRefNum := int32(0)
 
 	// output file var
 	var recvFileBuf []byte
@@ -163,21 +165,21 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 		// wait stream by client
 		in, err := stream.Recv()
 		if err != nil {
-			return fmt.Sprintf("cant receive message"), kanbanpb.UploadStatusCode_Failed
+			return fmt.Sprintf("cant receive message, %v", err), kanbanpb.UploadStatusCode_Failed
 		}
 		fmt.Printf("%s", in.Code)
 		switch in.Code {
 		// receive kanban
 		case kanbanpb.UploadRequestCode_SendingKanban:
 			// receive file
-			if err := sendingKanban(in, kContainer, &dirPath); err != nil {
+			if err := sendingKanban(in, kContainer, &dirPath, &nextRefNum); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
 		case kanbanpb.UploadRequestCode_SendingFile_CONT:
-			if err := ptypes.UnmarshalAny(in.Context, chunk); err != nil {
-				return fmt.Sprintf("cant unmarshal any, %v", err), kanbanpb.UploadStatusCode_Failed
+			if err := sendingKanbanCont(in.Context, &recvFileBuf, nextRefNum); err != nil {
+				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
-			recvFileBuf = append(recvFileBuf, chunk.Context...)
+			nextRefNum++
 		case kanbanpb.UploadRequestCode_SendingFile_EOF:
 			// receive eos
 			if err := sendingFileEOF(in, chunk, recvFileBuf, dirPath, &numOfOutputFile); err != nil {
@@ -186,20 +188,20 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 		case kanbanpb.UploadRequestCode_EOS:
 			// receive eof from stream
 			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
-				return fmt.Sprintf("enough files haven't received yet"), kanbanpb.UploadStatusCode_Failed
+				return "enough files haven't received yet", kanbanpb.UploadStatusCode_Failed
 			}
 			srv.sendToServiceBrokerCh <- kContainer
-			return fmt.Sprintf("all files are received"), kanbanpb.UploadStatusCode_OK
+			return "all files are received", kanbanpb.UploadStatusCode_OK
 		default:
 			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
-				return fmt.Sprintf("enough files haven't received yet"), kanbanpb.UploadStatusCode_Failed
+				return "enough files haven't received yet", kanbanpb.UploadStatusCode_Failed
 			}
 			srv.sendToServiceBrokerCh <- kContainer
-			return fmt.Sprintf("all files are received"), kanbanpb.UploadStatusCode_OK
+			return "all files are received", kanbanpb.UploadStatusCode_OK
 		}
 	}
 }
-func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, dirPath *string) error {
+func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, dirPath *string, lastRefNum *int32) error {
 	if err := ptypes.UnmarshalAny(in.Context, kContainer); err != nil {
 		return fmt.Errorf("cant unmarshal any, %v", err)
 	}
@@ -210,6 +212,19 @@ func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, di
 		}
 	}
 	log.Printf("[SendToOtherDevices server] receive kanban (nextService: %s)", kContainer.NextService)
+	return nil
+}
+
+func sendingKanbanCont(dataContent *anypb.Any, recvFileBuf *[]byte, wantRefNum int32) error {
+	chunk := &kanbanpb.Chunk{}
+	if err := ptypes.UnmarshalAny(dataContent, chunk); err != nil {
+		return fmt.Errorf("cant unmarshal any, %v", err)
+	}
+	if chunk.RefNum != wantRefNum {
+		return fmt.Errorf("sending kanban order is not correct. want:%d got:%d", wantRefNum, chunk.RefNum)
+	}
+	wantRefNum++
+	*recvFileBuf = append(*recvFileBuf, chunk.Context...)
 	return nil
 }
 
@@ -230,8 +245,6 @@ func sendingFileEOF(in *kanbanpb.SendContext, chunk *kanbanpb.Chunk, recvFileBuf
 		return fmt.Errorf("cant write output file: %v", err)
 	}
 	log.Printf("[SendToOtherDevices server] success to write file (%s)", filePath)
-	fileName = ""
-	recvFileBuf = []byte{}
 	*numOfOutputFile += 1
 	f.Close()
 	return nil
