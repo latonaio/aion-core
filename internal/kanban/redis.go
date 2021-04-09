@@ -78,33 +78,40 @@ func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb
 func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanpb.StatusKanban, msName string, msNumber int, statusType StatusType, deleteOldKanban bool) {
 	defer func() {
 		log.Printf("[watch kanban] stop watch kanban %s:%d", msName, msNumber)
+		close(kanbanCh)
 	}()
 
 	prevID := initPrevID
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 	ch := make(chan *kanbanpb.StatusKanban)
 	go func() {
+		defer close(ch)
 		for {
-			hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{prevID}, 1, 0)
-			if err != nil {
-				log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
-				close(ch)
+			select {
+			case <-ctx.Done():
+				log.Printf("[watch kanban] redis context closed")
 				return
-			}
-			if deleteOldKanban {
-				log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, prevID)
-				if err := a.redis.XDel(streamKey, []string{prevID}); err != nil {
-					log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, prevID)
+			default:
+				hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{prevID}, 1, 0)
+				if err != nil {
+					log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
+					return
 				}
+				if deleteOldKanban {
+					log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, prevID)
+					if err := a.redis.XDel(streamKey, []string{prevID}); err != nil {
+						log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, prevID)
+					}
+				}
+				prevID = nextID
+				k, err := unmarshalKanban(hash)
+				if err != nil {
+					log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
+					continue
+				}
+				log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
+				ch <- k
 			}
-			prevID = nextID
-			k, err := unmarshalKanban(hash)
-			if err != nil {
-				log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
-				continue
-			}
-			log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
-			ch <- k
 		}
 	}()
 
@@ -112,11 +119,11 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanp
 	for {
 		select {
 		case <-ctx.Done():
-			close(kanbanCh)
+			log.Printf("[watch kanban] context closed")
 			return
 		case k, ok := <-ch:
 			if !ok {
-				close(kanbanCh)
+				log.Printf("[watch kanban] redis channel closed")
 				return
 			}
 			kanbanCh <- k

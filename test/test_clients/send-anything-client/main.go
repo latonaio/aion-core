@@ -28,10 +28,7 @@ func main() {
 	quiteCh := make(chan syscall.Signal, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	c, err := msclient.NewKanbanClient(ctx, msName)
-	errStop(err)
-
-	_, err = c.SetKanban()
+	c, err := msclient.NewKanbanClient(ctx, msName, kanbanpb.InitializeType_START_SERVICE_WITHOUT_KANBAN)
 	errStop(err)
 
 	addDevName := msclient.Option(

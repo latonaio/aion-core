@@ -24,6 +24,7 @@ message Microservice {
     bool privileged = 17;
     bool withoutKanban = 18;
     string targetNode = 19;
+    Resources resources = 20;
 }
 
 message PortConfig {
@@ -40,4 +41,13 @@ message NextServiceSetting {
     string nextServiceName = 1;
     string numberPattern = 2;
     string nextDevice = 3;
+}
+
+message Resources {
+    ResourceConfig requests = 1;
+    ResourceConfig limits = 2;
+}
+message ResourceConfig {
+    string memory = 1;
+    string cpu = 2;
 }

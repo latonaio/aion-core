@@ -147,6 +147,22 @@ func (as *YamlAionSetting) mapToGRPCAionSetting() *projectpb.AionSetting {
 					m.Ports = append(m.Ports, p)
 				}
 			}
+			if value.Resources != nil {
+				r := &servicepb.Resources{}
+				if value.Resources.Requests != nil {
+					rr := &ResourceConfig{}
+					rr.Memory = value.Resources.Requests.Memory
+					rr.Cpu = value.Resources.Requests.Cpu
+					r.Requests = rr
+				}
+				if value.Resources.Limits != nil {
+					rl := &ResourceConfig{}
+					rl.Memory = value.Resources.Limits.Memory
+					rl.Cpu = value.Resources.Limits.Cpu
+					r.Limits = rl
+				}
+				m.Resources = r
+			}
 			grpcAionSetting.Microservices[key] = m
 		}
 	}
