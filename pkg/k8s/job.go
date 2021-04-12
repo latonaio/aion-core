@@ -26,7 +26,7 @@ type Job struct {
 
 func NewJob(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string) *Job {
+	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string, resources *config.Resources) *Job {
 
 	return &Job{
 		name:        getLabelName(serviceName, number),
@@ -45,6 +45,7 @@ func NewJob(
 			privileged,
 			k8sEnv,
 			targetNode,
+			resources,
 		),
 	}
 }

@@ -23,7 +23,7 @@ type Deployment struct {
 
 func NewDeployment(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string) *Deployment {
+	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string, resources *config.Resources) *Deployment {
 
 	return &Deployment{
 		name:        getLabelName(serviceName, number),
@@ -42,6 +42,7 @@ func NewDeployment(
 			privileged,
 			k8sEnv,
 			targetNode,
+			resources,
 		),
 	}
 }

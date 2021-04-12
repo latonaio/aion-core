@@ -42,6 +42,8 @@ type PortConfig = servicepb.PortConfig
 
 type NextServiceSetting = servicepb.NextServiceSetting
 
+type Resources = servicepb.Resources
+
 type ResourceConfig = servicepb.ResourceConfig
 
 type Device = devicepb.Device

@@ -32,11 +32,12 @@ type Pod struct {
 	privileged          bool
 	k8sEnv              *K8sEnv
 	TargetNode          string
+	Resources           *config.Resources
 }
 
 func NewPod(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string) *Pod {
+	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string, resources *config.Resources) *Pod {
 
 	return &Pod{
 		name:                getLabelName(serviceName, number),
@@ -51,6 +52,7 @@ func NewPod(
 		privileged:          privileged,
 		k8sEnv:              k8sEnv,
 		TargetNode:          targetNode,
+		Resources:           resources,
 	}
 }
 
@@ -90,6 +92,7 @@ func (p *Pod) getContainer() apiV1.Container {
 		Ports:        p.getPortList(),
 		Env:          p.getEnvList(),
 		VolumeMounts: p.getVolumeMountList(),
+		Resources:    p.getResources(),
 	}
 }
 
@@ -249,4 +252,35 @@ func (p *Pod) getNodeSelector() map[string]string {
 		return map[string]string{"kubernetes.io/hostname": p.TargetNode}
 	}
 	return nil
+}
+
+func (p *Pod) getResources() apiV1.ResourceRequirements {
+	resources := apiV1.ResourceRequirements{}
+	if p.Resources != nil {
+		if p.Resources.Limits != nil {
+			resourceList := apiV1.ResourceList{}
+			if len(p.Resources.Limits.Memory) != 0 {
+				memory := resource.MustParse(p.Resources.Limits.Memory)
+				resourceList[apiV1.ResourceMemory] = memory
+			}
+			if len(p.Resources.Limits.Cpu) != 0 {
+				cpu := resource.MustParse(p.Resources.Limits.Cpu)
+				resourceList[apiV1.ResourceCPU] = cpu
+			}
+			resources.Limits = resourceList
+		}
+		if p.Resources.Requests != nil {
+			resourceList := apiV1.ResourceList{}
+			if len(p.Resources.Requests.Memory) != 0 {
+				memory := resource.MustParse(p.Resources.Requests.Memory)
+				resourceList[apiV1.ResourceMemory] = memory
+			}
+			if len(p.Resources.Requests.Cpu) != 0 {
+				cpu := resource.MustParse(p.Resources.Requests.Cpu)
+				resourceList[apiV1.ResourceCPU] = cpu
+			}
+			resources.Requests = resourceList
+		}
+	}
+	return resources
 }

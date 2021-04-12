@@ -35,6 +35,7 @@ func NewContainerMicroservice(k8sEnv *k8s.K8sEnv, msName string, data *config.Mi
 			data.Privileged,
 			k8sEnv,
 			data.TargetNode,
+			data.Resources,
 		)
 	} else {
 		k = k8s.NewDeployment(
@@ -49,6 +50,7 @@ func NewContainerMicroservice(k8sEnv *k8s.K8sEnv, msName string, data *config.Mi
 			data.Privileged,
 			k8sEnv,
 			data.TargetNode,
+			data.Resources,
 		)
 	}
 
