@@ -13,10 +13,8 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
@@ -42,20 +40,21 @@ func NewServer(env *Env) error {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
 
-	kaep := keepalive.EnforcementPolicy{
-		MinTime:             5 * time.Second,
-		PermitWithoutStream: true,
-	}
+	//kaep := keepalive.EnforcementPolicy{
+	//	MinTime:             5 * time.Second,
+	//	PermitWithoutStream: true,
+	//}
 
-	kasp := keepalive.ServerParameters{
-		Time:    2 * time.Minute,
-		Timeout: 1 * time.Minute,
-	}
+	//kasp := keepalive.ServerParameters{
+	//	Time:    2 * time.Minute,
+	//	Timeout: 1 * time.Minute,
+	//}
 
-	grpcServer := grpc.NewServer(
-		grpc.KeepaliveEnforcementPolicy(kaep),
-		grpc.KeepaliveParams(kasp),
-	)
+	//grpcServer := grpc.NewServer(
+	//	grpc.KeepaliveEnforcementPolicy(kaep),
+	//	grpc.KeepaliveParams(kasp),
+	//)
+	grpcServer := grpc.NewServer()
 	kanbanpb.RegisterKanbanServer(grpcServer, server)
 	log.Printf("Start Status kanban server:%d", env.GetServerPort())
 
@@ -78,7 +77,7 @@ func NewServer(env *Env) error {
 }
 
 func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanpb.Kanban_ReceiveKanbanServer) error {
-	ctx, cancel := context.WithCancel(stream.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		log.Printf("[ReceiveKanban] connection closed: %s", req.MicroserviceName)
 		cancel()
@@ -86,8 +85,7 @@ func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanp
 
 	// create redis pool when recieve gRPC call is no reasonable in terms of speed.
 	// but we should do this becase must close connection to don't overflow block xread connection.
-	session := NewMicroserviceSession(srv.io, req)
-	session.dataPath = srv.env.GetDataDir()
+	session := NewMicroserviceSession(srv.io, srv.env.GetDataDir(), req)
 
 	recvCh := make(chan *kanbanpb.StatusKanban)
 	errCh := make(chan error)
@@ -109,7 +107,7 @@ func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanp
 				return nil
 			}
 			if err := stream.Send(res); err != nil {
-				log.Errorf("[ReceiveKanban] failed to send")
+				log.Errorf("[ReceiveKanban] failed to send: %v", err)
 				return err
 			}
 		case err := <-errCh:

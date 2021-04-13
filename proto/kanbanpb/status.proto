@@ -39,6 +39,13 @@ message SendKanban {
     StatusKanban afterKanban = 5;
 }
 
+message FileInfo {
+    int32 size = 1;
+    int32 chunkCnt = 2;
+    bytes hash = 3;
+    string name = 4;
+}
+
 message Chunk {
     bytes context = 1;
     string name = 2;
@@ -51,6 +58,8 @@ enum UploadRequestCode {
     SendingFile_EOF = 2;
     SendingFile_FAILED = 3;
     EOS = 4;
+
+    SendingFile_Info = 5;
 }
 
 message SendContext {

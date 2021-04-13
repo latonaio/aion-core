@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
-	"time"
 
 	"bitbucket.org/latonaio/aion-core/pkg/common"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
@@ -108,33 +107,6 @@ func (srv *Server) ServiceBrokerConn(stream kanbanpb.SendAnything_ServiceBrokerC
 	}
 }
 
-func checkFileStatus(filePath string) error {
-	var fileSize int64 = 0
-	for i := 0; i < 10; i++ {
-		f, err := os.Open(filePath)
-		defer f.Close()
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("cant open file: %s", filePath))
-		}
-		stat, err := f.Stat()
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("cant get file stat: %s", filePath))
-		}
-		if i == 0 {
-			fileSize = stat.Size()
-		} else {
-			prevFileSize := fileSize
-			fileSize = stat.Size()
-			log.Printf("[SendToOtherDevices client] check file size: %v", fileSize)
-			if prevFileSize == fileSize && fileSize != 0 {
-				break
-			}
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	return nil
-}
-
 // callback that server receive data from other client
 func (srv *Server) SendToOtherDevices(stream kanbanpb.SendAnything_SendToOtherDevicesServer) error {
 	log.Printf("[SendToOtherDevices server] create connection")
@@ -154,7 +126,6 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 
 	// received message var
 	kContainer := &kanbanpb.SendKanban{}
-	chunk := &kanbanpb.Chunk{}
 	nextRefNum := int32(0)
 
 	// output file var
@@ -175,6 +146,11 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 			if err := sendingKanban(in, kContainer, &dirPath, &nextRefNum); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
+		case kanbanpb.UploadRequestCode_SendingFile_Info:
+			// receive file
+			if err := sendingKanbanInfo(in); err != nil {
+				return err.Error(), kanbanpb.UploadStatusCode_Failed
+			}
 		case kanbanpb.UploadRequestCode_SendingFile_CONT:
 			if err := sendingKanbanCont(in.Context, &recvFileBuf, nextRefNum); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
@@ -182,7 +158,7 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 			nextRefNum++
 		case kanbanpb.UploadRequestCode_SendingFile_EOF:
 			// receive eos
-			if err := sendingFileEOF(in, chunk, recvFileBuf, dirPath, &numOfOutputFile); err != nil {
+			if err := sendingFileEOF(in, recvFileBuf, dirPath, &numOfOutputFile); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
 		case kanbanpb.UploadRequestCode_EOS:
@@ -214,7 +190,16 @@ func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, di
 	log.Printf("[SendToOtherDevices server] receive kanban (nextService: %s)", kContainer.NextService)
 	return nil
 }
+func sendingKanbanInfo(in *kanbanpb.SendContext) error {
+	content := &kanbanpb.FileInfo{}
+	if err := ptypes.UnmarshalAny(in.Context, content); err != nil {
+		return fmt.Errorf("cant unmarshal any, %v", err)
+	}
 
+	// ちゃんととって来れているか確認
+	LOG(content)
+	return nil
+}
 func sendingKanbanCont(dataContent *anypb.Any, recvFileBuf *[]byte, wantRefNum int32) error {
 	chunk := &kanbanpb.Chunk{}
 	if err := ptypes.UnmarshalAny(dataContent, chunk); err != nil {
@@ -228,9 +213,14 @@ func sendingKanbanCont(dataContent *anypb.Any, recvFileBuf *[]byte, wantRefNum i
 	return nil
 }
 
-func sendingFileEOF(in *kanbanpb.SendContext, chunk *kanbanpb.Chunk, recvFileBuf []byte, dirPath string, numOfOutputFile *int) error {
+func sendingFileEOF(in *kanbanpb.SendContext, recvFileBuf []byte, dirPath string, numOfOutputFile *int) error {
+	chunk := &kanbanpb.Chunk{}
+	if err := ptypes.UnmarshalAny(in.Context, chunk); err != nil {
+		return fmt.Errorf("cant unmarshal any, %v", err)
+	}
 	fileName := filepath.Base(chunk.Name)
 	filePath := path.Join(dirPath, fileName)
+
 	if f, err := os.Stat(dirPath); os.IsNotExist(err) || !f.IsDir() {
 		if err := os.MkdirAll(dirPath, 0775); err != nil {
 			log.Printf("[SendToOtherDevices server] cant create directory, %v", err)

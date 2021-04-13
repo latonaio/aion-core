@@ -83,49 +83,30 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanp
 
 	prevID := initPrevID
 	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
-	ch := make(chan *kanbanpb.StatusKanban)
-	go func() {
-		defer close(ch)
-		for {
-			select {
-			case <-ctx.Done():
-				log.Printf("[watch kanban] redis context closed")
-				return
-			default:
-				hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{prevID}, 1, 0)
-				if err != nil {
-					log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
-					return
-				}
-				if deleteOldKanban {
-					log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, prevID)
-					if err := a.redis.XDel(streamKey, []string{prevID}); err != nil {
-						log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, prevID)
-					}
-				}
-				prevID = nextID
-				k, err := unmarshalKanban(hash)
-				if err != nil {
-					log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
-					continue
-				}
-				log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
-				ch <- k
-			}
-		}
-	}()
-
-	log.Printf("[watch kanban] start watch kanban %s:%d", msName, msNumber)
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[watch kanban] context closed")
+			log.Printf("[watch kanban] redis context closed")
 			return
-		case k, ok := <-ch:
-			if !ok {
-				log.Printf("[watch kanban] redis channel closed")
+		default:
+			hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{prevID}, 1, 0)
+			if err != nil {
+				log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
 				return
 			}
+			if deleteOldKanban {
+				log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, prevID)
+				if err := a.redis.XDel(streamKey, []string{prevID}); err != nil {
+					log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, prevID)
+				}
+			}
+			prevID = nextID
+			k, err := unmarshalKanban(hash)
+			if err != nil {
+				log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
+				continue
+			}
+			log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
 			kanbanCh <- k
 		}
 	}

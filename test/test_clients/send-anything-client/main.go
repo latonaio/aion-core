@@ -42,7 +42,7 @@ func main() {
 			if d.FileList == nil {
 				d.FileList = make([]string, 0, 1)
 			}
-			d.FileList = append(d.FileList, "sendData/sendfile.txt")
+			d.FileList = append(d.FileList, "/var/lib/aion/Data/aion-send-test-kube_1/sendData/testData.png")
 			return nil
 		},
 	)

@@ -18,8 +18,8 @@ type Session struct {
 }
 
 // create microservice session
-func NewMicroserviceSession(io kanban.Adapter, microservice *kanbanpb.InitializeService) *Session {
-	session := newSession(io, microservice.MicroserviceName, int(microservice.ProcessNumber))
+func NewMicroserviceSession(io kanban.Adapter, dataPath string, microservice *kanbanpb.InitializeService) *Session {
+	session := newSession(io, microservice.MicroserviceName, int(microservice.ProcessNumber), dataPath)
 	if microservice.InitType == kanbanpb.InitializeType_START_SERVICE_WITHOUT_KANBAN {
 		session.setKanban()
 	}
@@ -27,11 +27,12 @@ func NewMicroserviceSession(io kanban.Adapter, microservice *kanbanpb.Initialize
 }
 
 // create struct of session with service broker
-func newSession(io kanban.Adapter, msName string, msNumber int) *Session {
+func newSession(io kanban.Adapter, msName string, msNumber int, dataPath string) *Session {
 	return &Session{
 		io:               io, // kanban io ( redis or directory )
 		microserviceName: msName,
 		processNumber:    msNumber,
+		dataPath:         dataPath,
 	}
 }
 

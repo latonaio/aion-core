@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"bitbucket.org/latonaio/aion-core/cmd/send-anything/app/baggage"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"github.com/avast/retry-go"
@@ -81,45 +81,47 @@ func sendToOtherDeviceClient(ctx context.Context, m *kanbanpb.SendKanban, port i
 		log.Printf("[SendToOtherDevice client] success to send kanban and files: %s", deviceAddr)
 	}()
 
-	eachFileStatus, isAllOK := filesExists(m.AfterKanban.FileList)
+	// send kanban and files
+	if err := startSending(stream, m); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("destination　address: %s", deviceAddr))
+	}
 
-	if !isAllOK {
-		invalidFilePaths := make([]string, 0, len(eachFileStatus))
-		for i, ok := range eachFileStatus {
-			if !ok {
+	return nil
+}
+
+func startSending(stream kanbanpb.SendAnything_SendToOtherDevicesClient, m *kanbanpb.SendKanban) error {
+	files, err := baggage.CreateFilesInfo(m.AfterKanban.FileList)
+	if err != nil {
+		return err
+	}
+	// 全て送るか、全て送らないかにしている。後で、選択できるようにしたい。
+	allOK := files.IsAllExist()
+
+	if !allOK {
+		invalidFilePaths := make([]string, 0, len(files))
+		for i, f := range files {
+			if !f.IsExist() {
 				invalidFilePaths = append(invalidFilePaths, m.AfterKanban.FileList[i])
 			}
 		}
 		return errors.Errorf("cannot open file(s) %v", invalidFilePaths)
 	}
 
-	// send kanban and files
+	errLog := make([]error, 0, 3)
+
 	if err := sendKanban(stream, m); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("[SendToOtherDevice client] sending kanban is failed: %s", deviceAddr))
+		errLog = append(errLog, errors.Wrap(err, "[SendToOtherDevice client] sending kanban is failed"))
 	}
-	if err := sendFileList(stream, m); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("[SendToOtherDevice client] sending files are failed: %s", deviceAddr))
+	if err := sendFileList(stream, m, files); err != nil {
+		errLog = append(errLog, errors.Wrap(err, "[SendToOtherDevice client] sending files are failed"))
 	}
 	if err := sendEos(stream); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("[SendToOtherDevice client] sending eos is failed: %s", deviceAddr))
+		errLog = append(errLog, errors.Wrap(err, "[SendToOtherDevice client] sending eos is failed"))
 	}
-
-	return nil
-}
-
-func filesExists(filePaths []string) ([]bool, bool) {
-	existStatus := make([]bool, 0, len(filePaths))
-	allOK := true
-
-	for _, path := range filePaths {
-		thisFile := fileExists(path)
-		existStatus = append(existStatus, thisFile)
-
-		if allOK && !thisFile {
-			allOK = false
-		}
+	if len(errLog) > 0 {
+		err = errors.Errorf("sending error: %v", errLog)
 	}
-	return existStatus, allOK
+	return err
 }
 
 // send kanban to other devices
@@ -141,34 +143,79 @@ func sendKanban(stream kanbanpb.SendAnything_SendToOtherDevicesClient, m *kanban
 	return nil
 }
 
-func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return err == nil
+// send data by file list to other devices
+func sendFileList(stream kanbanpb.SendAnything_SendToOtherDevicesClient, m *kanbanpb.SendKanban, files baggage.FilesInfo) error {
+	errStr := make([]string, 0, len(files))
+	for _, f := range files {
+		if f != nil {
+			if err := sendFile(stream, f); err != nil {
+				errStr = append(errStr, err.Error())
+			}
+		}
+	}
+	if len(errStr) != 0 {
+		return fmt.Errorf("cant send files\n%s", strings.Join(errStr, "\n"))
+	}
+	return nil
+}
+
+func sendFileInfo(stream kanbanpb.SendAnything_SendToOtherDevicesClient, f *baggage.FileInfo) error {
+	req := &kanbanpb.SendContext{}
+	req.Code = kanbanpb.UploadRequestCode_SendingFile_Info
+	hash, err := f.Hash()
+	if err != nil {
+		return err
+	}
+
+	anyInfo, err := anypb.New(
+		&kanbanpb.FileInfo{
+			Size:     int32(f.Size()),
+			Hash:     hash,
+			Name:     f.Name(),
+			ChunkCnt: int32(f.Size() / chunkSize),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Context = anyInfo
+	if err := sendToServer(stream, req); err != nil {
+		return sendToServerNotifyFailure(stream)
+	}
+	return nil
 }
 
 // send data to other devices
-func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, fileName string, filePath string) error {
-	log.Printf("[SendToOtherDevices client] start to send file: %s, %s", fileName, filePath)
-	if err := checkFileStatus(filePath); err != nil {
+func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, file *baggage.FileInfo) error {
+	if file == nil || !file.IsExist() {
+		return errors.Errorf("skip sending a file")
+	}
+	log.Printf("[SendToOtherDevices client] start to send file: %s", file.Name())
+
+	err := sendFileInfo(stream, file)
+	if err != nil {
 		return err
 	}
-	f, err := os.Open(filePath)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cant open file: %s", filePath))
-	}
-	defer f.Close()
-
-	for cnt := int32(0); true; cnt++ {
+	for refNum := int32(0); true; refNum++ {
 		var req *kanbanpb.SendContext
 		chunk := make([]byte, chunkSize)
-		count, err := f.Read(chunk)
+		count, err := file.GetChunk(chunk)
 		if err != nil {
 			if err != io.EOF {
 				return sendToServerNotifyFailure(stream)
 			}
+			anyChunk, err := anypb.New(&kanbanpb.Chunk{
+				Context: chunk[:count],
+				Name:    file.Path(),
+				RefNum:  refNum,
+			})
+			if err != nil {
+				return sendToServerNotifyFailure(stream)
+			}
 			req = &kanbanpb.SendContext{
 				Code:    kanbanpb.UploadRequestCode_SendingFile_EOF,
-				Context: nil,
+				Context: anyChunk,
 			}
 			if err := sendToServer(stream, req); err != nil {
 				return sendToServerNotifyFailure(stream)
@@ -177,8 +224,8 @@ func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, fileName st
 		}
 		anyChunk, err := anypb.New(&kanbanpb.Chunk{
 			Context: chunk[:count],
-			Name:    fileName,
-			RefNum:  cnt,
+			Name:    file.Path(),
+			RefNum:  refNum,
 		})
 		if err != nil {
 			return sendToServerNotifyFailure(stream)
@@ -191,30 +238,7 @@ func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, fileName st
 			return sendToServerNotifyFailure(stream)
 		}
 	}
-	log.Printf("[SendToOtherDevices client] finish to send file: %s, %s", fileName, filePath)
-	return nil
-}
-
-// send data by file list to other devices
-func sendFileList(stream kanbanpb.SendAnything_SendToOtherDevicesClient, m *kanbanpb.SendKanban) error {
-	var errStr []string
-	for _, fileName := range m.AfterKanban.FileList {
-		fileExists := fileExists(fileName)
-		if fileExists {
-			filePath := fileName
-			if err := sendFile(stream, fileName, filePath); err != nil {
-				errStr = append(errStr, err.Error())
-			}
-		} else {
-			filePath := path.Join(m.AfterKanban.DataPath, fileName)
-			if err := sendFile(stream, fileName, filePath); err != nil {
-				errStr = append(errStr, err.Error())
-			}
-		}
-	}
-	if len(errStr) != 0 {
-		return fmt.Errorf("cant send files\n%s", strings.Join(errStr, "\n"))
-	}
+	log.Printf("[SendToOtherDevices client] finish to send file: %s", file.Name())
 	return nil
 }
 
@@ -228,4 +252,11 @@ func sendEos(stream kanbanpb.SendAnything_SendToOtherDevicesClient) error {
 		return err
 	}
 	return nil
+}
+
+func LOG(any interface{}) {
+	_, f, l, _ := runtime.Caller(1)
+	log.Printf("DEBUG from %s:%d", f, l)
+	log.Printf("%v", any)
+	log.Printf("")
 }
