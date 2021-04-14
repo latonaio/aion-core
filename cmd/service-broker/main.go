@@ -67,6 +67,10 @@ func main() {
 	case app.WorkerMode:
 		// start grpc client
 		go workerClient(ctx, env, msc, aionCh)
+	default:
+		log.Println("start ServiceBroker DefaultServer ")
+		// starg grpc server
+		go defaultServer(aionCh, env, redis)
 	}
 
 	log.Println("started all process")
@@ -156,6 +160,21 @@ func workerClient(ctx context.Context, env *app.Config, msc mscStatus, applyAion
 		}
 
 		log.Println("debug grpc client requested")
+	}
+}
+
+func defaultServer(aionCh chan<- *config.AionSetting, env *app.Config, redis *my_redis.RedisClient) {
+	lis, err := net.Listen("tcp", ":11111")
+	if err != nil {
+		log.Fatalf("cant start server")
+	}
+
+	s := grpc.NewServer()
+	server := services.NewProjectServer(aionCh, env.IsDocker(), redis)
+	pjpb.RegisterProjectServer(s, server)
+
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("cant start server")
 	}
 }
 
