@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// 後で、送る用、受け取る用の構造体に分けるか、統合するかしたい。
 type FileInfo struct {
 	file     *os.File
 	fileName string
@@ -34,7 +35,6 @@ func CreateFileInfo(path string) (*FileInfo, error) {
 	if info.IsDir() {
 		return nil, errors.Errorf("cannot specify directory: %s", path)
 	}
-
 	d, n := filepath.Split(path)
 	fInfo := &FileInfo{
 		file:     f,
@@ -70,14 +70,17 @@ func (f *FileInfo) Hash() ([]byte, error) {
 	if f.hash != nil && string(f.hash) != "" {
 		return f.hash, nil
 	}
-
+	f.file.Seek(0, 0)
 	h := md5.New()
 	if _, err := io.Copy(h, f.file); err != nil {
 		return nil, err
 	}
 	f.hash = h.Sum(nil)
+	f.file.Seek(0, 0)
 	return f.hash, nil
 }
+
+type FilesInfo []*FileInfo
 
 func CreateFilesInfo(filePaths []string) (FilesInfo, error) {
 	fInfo := make([]*FileInfo, 0, len(filePaths))
@@ -99,8 +102,6 @@ func CreateFilesInfo(filePaths []string) (FilesInfo, error) {
 	return fInfo, err
 }
 
-type FilesInfo []*FileInfo
-
 func (fs *FilesInfo) IsAllExist() bool {
 	for _, f := range *fs {
 		if !f.IsExist() {
@@ -114,4 +115,16 @@ func LOG(any interface{}) {
 	log.Printf("DEBUG from %s:%d", f, l)
 	log.Printf("%v", any)
 	log.Printf("")
+}
+
+type DirInfo struct {
+	dirPath   string
+	files     *FilesInfo
+	subDirs   *[]*DirInfo
+	parentDir *DirInfo
+}
+
+func CreateDirInfo(path string) (*DirInfo, error) {
+
+	return nil, nil
 }

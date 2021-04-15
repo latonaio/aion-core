@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -131,6 +133,7 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 	// output file var
 	var recvFileBuf []byte
 	numOfOutputFile := 0
+	hash := []byte{}
 
 	for {
 		// wait stream by client
@@ -148,7 +151,7 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 			}
 		case kanbanpb.UploadRequestCode_SendingFile_Info:
 			// receive file
-			if err := sendingKanbanInfo(in); err != nil {
+			if err := sendingKanbanInfo(in, &hash); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
 		case kanbanpb.UploadRequestCode_SendingFile_CONT:
@@ -158,9 +161,10 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 			nextRefNum++
 		case kanbanpb.UploadRequestCode_SendingFile_EOF:
 			// receive eos
-			if err := sendingFileEOF(in, recvFileBuf, dirPath, &numOfOutputFile); err != nil {
+			if err := sendingFileEOF(in, recvFileBuf, dirPath, &numOfOutputFile, hash, &nextRefNum); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
+			recvFileBuf = make([]byte, 0, 0)
 		case kanbanpb.UploadRequestCode_EOS:
 			// receive eof from stream
 			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
@@ -190,7 +194,7 @@ func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, di
 	log.Printf("[SendToOtherDevices server] receive kanban (nextService: %s)", kContainer.NextService)
 	return nil
 }
-func sendingKanbanInfo(in *kanbanpb.SendContext) error {
+func sendingKanbanInfo(in *kanbanpb.SendContext, hash *[]byte) error {
 	content := &kanbanpb.FileInfo{}
 	if err := ptypes.UnmarshalAny(in.Context, content); err != nil {
 		return fmt.Errorf("cant unmarshal any, %v", err)
@@ -198,6 +202,7 @@ func sendingKanbanInfo(in *kanbanpb.SendContext) error {
 
 	// ちゃんととって来れているか確認
 	LOG(content)
+	*hash = content.Hash
 	return nil
 }
 func sendingKanbanCont(dataContent *anypb.Any, recvFileBuf *[]byte, wantRefNum int32) error {
@@ -213,7 +218,7 @@ func sendingKanbanCont(dataContent *anypb.Any, recvFileBuf *[]byte, wantRefNum i
 	return nil
 }
 
-func sendingFileEOF(in *kanbanpb.SendContext, recvFileBuf []byte, dirPath string, numOfOutputFile *int) error {
+func sendingFileEOF(in *kanbanpb.SendContext, recvFileBuf []byte, dirPath string, numOfOutputFile *int, hash []byte, nextRefNum *int32) error {
 	chunk := &kanbanpb.Chunk{}
 	if err := ptypes.UnmarshalAny(in.Context, chunk); err != nil {
 		return fmt.Errorf("cant unmarshal any, %v", err)
@@ -234,6 +239,19 @@ func sendingFileEOF(in *kanbanpb.SendContext, recvFileBuf []byte, dirPath string
 		f.Close()
 		return fmt.Errorf("cant write output file: %v", err)
 	}
+
+	*nextRefNum = 0
+	f.Seek(0, 0)
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+
+	if string(hash) != string(h.Sum(nil)) {
+		return fmt.Errorf("Received file is broken")
+	}
+
 	log.Printf("[SendToOtherDevices server] success to write file (%s)", filePath)
 	*numOfOutputFile += 1
 	f.Close()
