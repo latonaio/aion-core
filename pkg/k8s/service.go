@@ -5,9 +5,11 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"github.com/avast/retry-go"
 	apiV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -67,7 +69,24 @@ func (s *Service) Delete() error {
 		return fmt.Errorf("[k8s] Delete Service is failed: %v", err)
 	}
 
-	log.Printf("[k8s] Deleted service %s", name)
+	const connRetryCount = 30
+	if err := retry.Do(
+		func() error {
+			if _, err := s.service.Get(ctx, s.name, metaV1.GetOptions{}); err != nil {
+				log.Printf("[k8s] Deleted service %s", name)
+				return nil
+			}
+			return fmt.Errorf("[k8s] Service is not deleted")
+		},
+		retry.DelayType(func(n uint, config *retry.Config) time.Duration {
+			log.Printf("[k8s] Retry to check service is deleted")
+			return 2 * time.Second
+		}),
+		retry.Attempts(connRetryCount),
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 

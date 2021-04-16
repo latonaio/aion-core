@@ -5,9 +5,11 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"github.com/avast/retry-go"
 	appsV1 "k8s.io/api/apps/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -76,7 +78,24 @@ func (d *Deployment) Delete() error {
 		return fmt.Errorf("[k8s] Delete deployment is failed: %v", err)
 	}
 
-	log.Printf("[k8s] Deleted deployment %s", d.name)
+	const connRetryCount = 30
+	if err := retry.Do(
+		func() error {
+			if _, err := d.deployment.Get(ctx, d.name, metaV1.GetOptions{}); err != nil {
+				log.Printf("[k8s] Deleted deployment %s", d.name)
+				return nil
+			}
+			return fmt.Errorf("[k8s] Deployment is not deleted")
+		},
+		retry.DelayType(func(n uint, config *retry.Config) time.Duration {
+			log.Printf("[k8s] Retry to check deployment is deleted")
+			return 2 * time.Second
+		}),
+		retry.Attempts(connRetryCount),
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 

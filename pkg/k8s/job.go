@@ -60,29 +60,10 @@ func (j *Job) Apply() error {
 			return fmt.Errorf("[k8s] apply job is failed: %v", err)
 		}
 		log.Printf("[k8s] Created Job %s", result.GetObjectMeta().GetName())
-
 	} else {
 		if err := j.Delete(); err != nil {
 			return err
 		}
-		const connRetryCount = 10
-		if err := retry.Do(
-			func() error {
-				if _, err := j.job.Get(ctx, j.name, metaV1.GetOptions{}); err != nil {
-					log.Printf("[k8s] Duplicate job is deleted")
-					return nil
-				}
-				return fmt.Errorf("[k8s] Duplicate job is not deleted")
-			},
-			retry.DelayType(func(n uint, config *retry.Config) time.Duration {
-				log.Printf("[k8s] Retry to check duplicated job is deleted")
-				return time.Second
-			}),
-			retry.Attempts(connRetryCount),
-		); err != nil {
-			return err
-		}
-
 		result, err := j.job.Create(ctx, jobConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply job is failed: %v", err)
@@ -100,7 +81,24 @@ func (j *Job) Delete() error {
 		return fmt.Errorf("[k8s] Delete job is failed: %v", err)
 	}
 
-	log.Printf("[k8s] Deleted job %s", j.name)
+	const connRetryCount = 30
+	if err := retry.Do(
+		func() error {
+			if _, err := j.job.Get(ctx, j.name, metaV1.GetOptions{}); err != nil {
+				log.Printf("[k8s] Deleted job %s", j.name)
+				return nil
+			}
+			return fmt.Errorf("[k8s] Job is not deleted")
+		},
+		retry.DelayType(func(n uint, config *retry.Config) time.Duration {
+			log.Printf("[k8s] Retry to check job is deleted")
+			return 2 * time.Second
+		}),
+		retry.Attempts(connRetryCount),
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
