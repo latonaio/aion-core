@@ -33,7 +33,6 @@ type YamlMicroservice struct {
 	Position            string                        `yaml:",omitempty"`
 	Always              bool                          `yaml:",omitempty"`
 	Multiple            bool                          `yaml:",omitempty"`
-	Docker              bool                          `yaml:",omitempty"`
 	Startup             bool                          `yaml:",omitempty"`
 	Interval            int32                         `yaml:",omitempty"`
 	Ports               []*YamlPortConfig             `yaml:",omitempty"`
@@ -113,7 +112,6 @@ func (as *YamlAionSetting) mapToGRPCAionSetting() *projectpb.AionSetting {
 			m.Position = value.Position
 			m.Always = value.Always
 			m.Multiple = value.Multiple
-			m.Docker = value.Docker
 			m.Startup = value.Startup
 			m.Interval = value.Interval
 			m.DirPath = value.DirPath

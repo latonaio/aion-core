@@ -33,7 +33,8 @@ func main() {
 
 	addDevName := msclient.Option(
 		func(d *kanbanpb.StatusKanban) error {
-			d.NextDeviceName = "pluto"
+			// d.NextDeviceName = "pluto"
+			d.NextDeviceName = "TashiroMac.local"
 			return nil
 		},
 	)
@@ -42,12 +43,17 @@ func main() {
 			if d.FileList == nil {
 				d.FileList = make([]string, 0, 1)
 			}
-			d.FileList = append(d.FileList, "/var/lib/aion/Data/aion-send-test-kube_1/sendData/testData.png")
-			d.FileList = append(d.FileList, "/var/lib/aion/Data/aion-send-test-kube_1/sendData/sendfile.txt")
+			// d.FileList = append(d.FileList, "/var/lib/aion/Data/sendDir")
+			// d.FileList = append(d.FileList, "/var/lib/aion/Data/sendDir/testData.png")
+			// d.FileList = append(d.FileList, "/var/lib/aion/Data/sendDir/sendFILE.txt")
+			d.FileList = append(d.FileList, "Data/sendDir")
+			d.FileList = append(d.FileList, "./Data/sendDir/testData.png")
+			d.FileList = append(d.FileList, "Data/sendDir/sendFILE.txt")
 			return nil
 		},
 	)
-	ck := msclient.SetConnectionKey("slack")
+	// ck := msclient.SetConnectionKey("slack")
+	ck := msclient.SetConnectionKey("mynote")
 	req, err := msclient.NewOutputData(ck, addDevName, addSendDataPath)
 	errStop(err)
 

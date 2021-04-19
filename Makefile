@@ -16,7 +16,7 @@ docker-push:
 	bash ./builders/docker-build-sendanything.sh push
 	bash ./builders/docker-build-kanban-replicator.sh push
 
-required-package:
+statik-build:
 	go get -v github.com/rakyll/statik
 	statik -src template -f
 
@@ -37,13 +37,11 @@ go-install: $(GO_SRCS)
 	go install ./cmd/kanban-replicator
 
 ################## testing
-test: go-test python-test
+test: go-test
 
 go-mock-build:
 	mockgen -source ./config/project.go -destination ./test/mock_config/mock_config.go
-	mockgen -source ./pkg/wsclient/client.go -destination ./test/mock_wsclient/mock_wsclient.go
 
-GO_PACKAGES=`go list ./... | grep -v -e test -e sftp`
 go-test: go-mock-build
 	go test $(GO_PACKAGES) -v -coverprofile=cover.out
 	go tool cover -html=cover.out -o cover.html

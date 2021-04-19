@@ -33,7 +33,7 @@ func main() {
 	env := app.GetConfig()
 
 	if env.IsDefaultMode() {
-		ya, err = config.LoadConfigFromDirectory(env.GetConfigPath(), env.IsDocker())
+		ya, err = config.LoadConfigFromDirectory(env.GetConfigPath())
 		if err != nil {
 			log.Fatalf("cant open yaml file (path: %s): %v", env.GetConfigPath(), err)
 		}
@@ -41,11 +41,8 @@ func main() {
 		aionCh <- ya
 	}
 	log.Debugln("debug aion chan <- done ")
-	if env.IsDocker() {
-		log.Printf("Use docker mode")
-		if err := k8s.PodsWatcher(ctx); err != nil {
-			log.Fatal(err)
-		}
+	if err := k8s.PodsWatcher(ctx); err != nil {
+		log.Fatal(err)
 	}
 
 	// service deploy　controller
@@ -94,7 +91,7 @@ func masterServer(workerStatusMonitoringCh chan<- map[string]map[string]bool, en
 
 	s := grpc.NewServer()
 	ww := services.NewWorkerWatcher(workerStatusMonitoringCh)
-	server := services.NewProjectServer(sendAionSettingToWorkerCh, env.IsDocker(), redis)
+	server := services.NewProjectServer(sendAionSettingToWorkerCh, redis)
 	clspb.RegisterClusterServer(s, ww)
 	pjpb.RegisterProjectServer(s, server)
 
@@ -141,7 +138,7 @@ func workerClient(ctx context.Context, env *app.Config, msc mscStatus, applyAion
 			}
 			log.Debugf("[grpc][client] RecvMsg service setting from master: %+v", rs)
 
-			aionSetting, err := config.LoadConfigFromGRPC(rs.AionSetting, env.IsDocker())
+			aionSetting, err := config.LoadConfigFromGRPC(rs.AionSetting)
 			if err != nil {
 				log.Printf("[worker][workerClient][LoadConfigFromGRPC] failed cause:%v", err)
 			}
@@ -170,7 +167,7 @@ func defaultServer(aionCh chan<- *config.AionSetting, env *app.Config, redis *my
 	}
 
 	s := grpc.NewServer()
-	server := services.NewProjectServer(aionCh, env.IsDocker(), redis)
+	server := services.NewProjectServer(aionCh, redis)
 	pjpb.RegisterProjectServer(s, server)
 
 	if err := s.Serve(lis); err != nil {

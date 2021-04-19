@@ -128,12 +128,11 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 
 	// received message var
 	kContainer := &kanbanpb.SendKanban{}
-	nextRefNum := int32(0)
 
 	// output file var
-	var recvFileBuf []byte
-	numOfOutputFile := 0
-	hash := []byte{}
+	fileInfo := &kanbanpb.FileInfo{}
+	fileBuilder := new(receivingFileBuilder)
+	receivedFileCnt := 0
 
 	for {
 		// wait stream by client
@@ -141,39 +140,34 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 		if err != nil {
 			return fmt.Sprintf("cant receive message, %v", err), kanbanpb.UploadStatusCode_Failed
 		}
-		fmt.Printf("%s", in.Code)
 		switch in.Code {
 		// receive kanban
 		case kanbanpb.UploadRequestCode_SendingKanban:
-			// receive file
-			if err := sendingKanban(in, kContainer, &dirPath, &nextRefNum); err != nil {
+			kContainer, err = receiveSendingKanban(in, &dirPath)
+			if err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
 		case kanbanpb.UploadRequestCode_SendingFile_Info:
-			// receive file
-			if err := sendingKanbanInfo(in, &hash); err != nil {
+			fileInfo, fileBuilder, err = receiveFileInfo(in)
+			if err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
 		case kanbanpb.UploadRequestCode_SendingFile_CONT:
-			if err := sendingKanbanCont(in.Context, &recvFileBuf, nextRefNum); err != nil {
+			if err = receiveFileCont(in.Context, fileBuilder); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
-			nextRefNum++
 		case kanbanpb.UploadRequestCode_SendingFile_EOF:
-			// receive eos
-			if err := sendingFileEOF(in, recvFileBuf, dirPath, &numOfOutputFile, hash, &nextRefNum); err != nil {
+			if err = receiveEOF(in, fileInfo, fileBuilder, dirPath, &receivedFileCnt); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
-			recvFileBuf = make([]byte, 0, 0)
 		case kanbanpb.UploadRequestCode_EOS:
-			// receive eof from stream
-			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
+			if err = receiveEOS(in, &receivedFileCnt); err != nil {
 				return "enough files haven't received yet", kanbanpb.UploadStatusCode_Failed
 			}
 			srv.sendToServiceBrokerCh <- kContainer
 			return "all files are received", kanbanpb.UploadStatusCode_OK
 		default:
-			if numOfOutputFile != len(kContainer.AfterKanban.FileList) {
+			if receivedFileCnt != len(kContainer.AfterKanban.FileList) {
 				return "enough files haven't received yet", kanbanpb.UploadStatusCode_Failed
 			}
 			srv.sendToServiceBrokerCh <- kContainer
@@ -181,9 +175,12 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 		}
 	}
 }
-func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, dirPath *string, lastRefNum *int32) error {
+
+func receiveSendingKanban(in *kanbanpb.SendContext, dirPath *string) (*kanbanpb.SendKanban, error) {
+	kContainer := &kanbanpb.SendKanban{}
+
 	if err := ptypes.UnmarshalAny(in.Context, kContainer); err != nil {
-		return fmt.Errorf("cant unmarshal any, %v", err)
+		return nil, fmt.Errorf("cant unmarshal any, %v", err)
 	}
 	*dirPath = common.GetMsDataPath(*dirPath, kContainer.NextService, int(kContainer.NextNumber))
 	if f, err := os.Stat(*dirPath); os.IsNotExist(err) || !f.IsDir() {
@@ -192,42 +189,47 @@ func sendingKanban(in *kanbanpb.SendContext, kContainer *kanbanpb.SendKanban, di
 		}
 	}
 	log.Printf("[SendToOtherDevices server] receive kanban (nextService: %s)", kContainer.NextService)
-	return nil
+	return kContainer, nil
 }
-func sendingKanbanInfo(in *kanbanpb.SendContext, hash *[]byte) error {
+func receiveFileInfo(in *kanbanpb.SendContext) (*kanbanpb.FileInfo, *receivingFileBuilder, error) {
 	content := &kanbanpb.FileInfo{}
 	if err := ptypes.UnmarshalAny(in.Context, content); err != nil {
-		return fmt.Errorf("cant unmarshal any, %v", err)
+		return nil, nil, fmt.Errorf("cant unmarshal any, %v", err)
 	}
 
 	// ちゃんととって来れているか確認
 	LOG(content)
-	*hash = content.Hash
-	return nil
+	fileBuilder := newReceivingFileBuilder(content)
+
+	return content, fileBuilder, nil
 }
-func sendingKanbanCont(dataContent *anypb.Any, recvFileBuf *[]byte, wantRefNum int32) error {
+func receiveFileCont(dataContent *anypb.Any, file *receivingFileBuilder) error {
 	chunk := &kanbanpb.Chunk{}
 	if err := ptypes.UnmarshalAny(dataContent, chunk); err != nil {
 		return fmt.Errorf("cant unmarshal any, %v", err)
 	}
-	if chunk.RefNum != wantRefNum {
-		return fmt.Errorf("sending kanban order is not correct. want:%d got:%d", wantRefNum, chunk.RefNum)
+	// LOG(fmt.Sprintf("chunkLen:%d , Want refNum:%d", len(chunk.Context), file.expectRefefNum))
+	if chunk.RefNum != file.expectRefefNum {
+		return fmt.Errorf("sending kanban order is not correct. want:%d got:%d", file.expectRefefNum, chunk.RefNum)
 	}
-	wantRefNum++
-	*recvFileBuf = append(*recvFileBuf, chunk.Context...)
+	file.expectRefefNum++
+	file.stack(&chunk.Context)
 	return nil
 }
 
-func sendingFileEOF(in *kanbanpb.SendContext, recvFileBuf []byte, dirPath string, numOfOutputFile *int, hash []byte, nextRefNum *int32) error {
-	chunk := &kanbanpb.Chunk{}
-	if err := ptypes.UnmarshalAny(in.Context, chunk); err != nil {
+func receiveEOF(in *kanbanpb.SendContext, fInfo *kanbanpb.FileInfo, file *receivingFileBuilder, dirPath string, numOfOutputFile *int) error {
+	file.expectRefefNum = 0
+	fInfoEOF := &kanbanpb.FileInfo{}
+	if err := ptypes.UnmarshalAny(in.Context, fInfoEOF); err != nil {
 		return fmt.Errorf("cant unmarshal any, %v", err)
 	}
-	fileName := filepath.Base(chunk.Name)
-	filePath := path.Join(dirPath, fileName)
+	fileName := filepath.Base(fInfoEOF.Name)
+	outputDir := path.Join(dirPath, fInfoEOF.RelDir)
+	filePath := path.Join(outputDir, fileName)
+	LOG(fInfoEOF.RelDir)
 
-	if f, err := os.Stat(dirPath); os.IsNotExist(err) || !f.IsDir() {
-		if err := os.MkdirAll(dirPath, 0775); err != nil {
+	if f, err := os.Stat(outputDir); os.IsNotExist(err) || !f.IsDir() {
+		if err := os.MkdirAll(outputDir, 0775); err != nil {
 			log.Printf("[SendToOtherDevices server] cant create directory, %v", err)
 		}
 	}
@@ -235,25 +237,64 @@ func sendingFileEOF(in *kanbanpb.SendContext, recvFileBuf []byte, dirPath string
 	if err != nil {
 		return fmt.Errorf("cant open output path: %v", err)
 	}
-	if _, err := f.Write(recvFileBuf); err != nil {
-		f.Close()
+	defer f.Close()
+	if _, err := f.Write(file.fileContent); err != nil {
 		return fmt.Errorf("cant write output file: %v", err)
 	}
 
-	*nextRefNum = 0
-	f.Seek(0, 0)
-
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-
-	if string(hash) != string(h.Sum(nil)) {
-		return fmt.Errorf("Received file is broken")
+	if string(fInfo.Hash) != getMD5(f) {
+		os.Remove(f.Name())
+		return fmt.Errorf("Received file [%v] is broken", f.Name())
 	}
 
 	log.Printf("[SendToOtherDevices server] success to write file (%s)", filePath)
 	*numOfOutputFile += 1
-	f.Close()
 	return nil
+}
+
+func getMD5(f *os.File) string {
+	f.Seek(0, 0)
+	defer f.Seek(0, 0)
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
+	}
+	return string(h.Sum(nil))
+}
+
+func receiveEOS(in *kanbanpb.SendContext, numOfOutputFile *int) error {
+	eos := &kanbanpb.StreamInfo{}
+	if err := ptypes.UnmarshalAny(in.Context, eos); err != nil {
+		return fmt.Errorf("cant unmarshal any, %v", err)
+	}
+
+	if eos.FileCount != int32(*numOfOutputFile) {
+		return errors.Errorf("sent files count and received files count is NOT equal. got: %d, want: %d", *numOfOutputFile, eos.FileCount)
+	}
+
+	*numOfOutputFile = 0
+	return nil
+}
+
+type receivingFileBuilder struct {
+	name           string
+	size           int64
+	fileContent    []byte
+	expectRefefNum int32
+}
+
+func newReceivingFileBuilder(fInfo *kanbanpb.FileInfo) *receivingFileBuilder {
+	content := make([]byte, 0, fInfo.Size)
+	fb := &receivingFileBuilder{
+		name:           fInfo.Name,
+		size:           fInfo.Size,
+		fileContent:    content,
+		expectRefefNum: 0,
+	}
+	return fb
+}
+
+func (fb *receivingFileBuilder) stack(content *[]byte) {
+	fb.fileContent = append(fb.fileContent, *content...)
 }

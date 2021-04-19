@@ -13,18 +13,16 @@ import (
 type projectServer struct {
 	sync.Mutex
 	pb.UnimplementedProjectServer
-	AionCh   chan<- *config.AionSetting
-	IsDocker bool
-	prj      *pb.AionSetting
-	redis    *my_redis.RedisClient
+	AionCh chan<- *config.AionSetting
+	prj    *pb.AionSetting
+	redis  *my_redis.RedisClient
 }
 
-func NewProjectServer(aionCh chan<- *config.AionSetting, isDocker bool, redis *my_redis.RedisClient) *projectServer {
+func NewProjectServer(aionCh chan<- *config.AionSetting, redis *my_redis.RedisClient) *projectServer {
 	return &projectServer{
-		AionCh:   aionCh,
-		IsDocker: isDocker,
-		prj:      nil,
-		redis:    redis,
+		AionCh: aionCh,
+		prj:    nil,
+		redis:  redis,
 	}
 }
 
@@ -33,7 +31,7 @@ func (p *projectServer) Apply(ctx context.Context, receivedAionSetting *pb.AionS
 	p.Lock()
 	p.prj = receivedAionSetting
 	p.Unlock()
-	aionSetting, err := config.LoadConfigFromGRPC(p.prj, p.IsDocker)
+	aionSetting, err := config.LoadConfigFromGRPC(p.prj)
 	if err != nil {
 		return &pb.Response{
 			Message: "Failed",
@@ -59,7 +57,7 @@ func (p *projectServer) Delete(ctx context.Context, prj *pb.AionSetting) (*pb.Re
 		}
 	}
 
-	aionSetting, err := config.LoadConfigFromGRPC(p.prj, p.IsDocker)
+	aionSetting, err := config.LoadConfigFromGRPC(p.prj)
 	if err != nil {
 		return &pb.Response{
 			Message: "Failed",

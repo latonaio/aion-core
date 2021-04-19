@@ -25,7 +25,6 @@ var (
 		Always:      false,
 		Position:    "Runtime",
 		Multiple:    false,
-		Docker:      false,
 		Startup:     false,
 		Interval:    0,
 	}

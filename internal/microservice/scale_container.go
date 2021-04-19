@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"bitbucket.org/latonaio/aion-core/pkg/k8s"
-	"bitbucket.org/latonaio/aion-core/pkg/log"
 
 	"bitbucket.org/latonaio/aion-core/config"
 )
@@ -29,21 +28,11 @@ type ScaleContainer struct {
 
 func NewScaleContainer(k8sEnv *k8s.K8sEnv, aionHome string, msName string, msData *config.Microservice) (*ScaleContainer, error) {
 	containerList := make(map[int]*ContainerStatus)
-	var err error
 	for i := 1; i <= int(msData.Scale); i++ {
 		// Set ms number
 		msData.Env["MS_NUMBER"] = strconv.Itoa(i)
 		var ms Container
-		log.Debugf("NewScaleContainer docker mode: %v", msData.Docker)
-		if msData.Docker {
-			msData.Env["IS_DOCKER"] = "true"
-			ms = NewContainerMicroservice(k8sEnv, msName, msData, i)
-		} else {
-			ms, err = NewDirectoryMicroservice(aionHome, msName, msData, i)
-			if err != nil {
-				return nil, err
-			}
-		}
+		ms = NewContainerMicroservice(k8sEnv, msName, msData, i)
 
 		containerList[i] = &ContainerStatus{
 			Container:    ms,

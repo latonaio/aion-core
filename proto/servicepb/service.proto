@@ -12,19 +12,18 @@ message Microservice {
     string position = 5;
     bool always = 6;
     bool multiple = 7;
-    bool docker = 8;
-    bool startup = 9;
-    int32 interval = 10;
-    repeated PortConfig ports = 11;
-    string dirPath = 12;
-    string serviceAccount = 13;
-    string network = 14;
-    string tag = 15;
-    repeated string volumeMountPathList = 16;
-    bool privileged = 17;
-    bool withoutKanban = 18;
-    string targetNode = 19;
-    Resources resources = 20;
+    bool startup = 8;
+    int32 interval = 9;
+    repeated PortConfig ports = 10;
+    string dirPath = 11;
+    string serviceAccount = 12;
+    string network = 13;
+    string tag = 14;
+    repeated string volumeMountPathList = 15;
+    bool privileged = 16;
+    bool withoutKanban = 17;
+    string targetNode = 18;
+    Resources resources = 19;
 }
 
 message PortConfig {

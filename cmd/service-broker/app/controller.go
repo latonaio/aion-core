@@ -213,7 +213,7 @@ func StartMicroservicesController(ctx context.Context, env *Config, aionCh <-cha
 		log.Errorf("cant initialized redis: %v", err)
 	}
 
-	dc, err := devices.NewDeviceController(ctx, env.IsDocker())
+	dc, err := devices.NewDeviceController(ctx)
 	if err != nil {
 		return nil, err
 	}

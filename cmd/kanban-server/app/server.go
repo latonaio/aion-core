@@ -40,20 +40,6 @@ func NewServer(env *Env) error {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
 
-	//kaep := keepalive.EnforcementPolicy{
-	//	MinTime:             5 * time.Second,
-	//	PermitWithoutStream: true,
-	//}
-
-	//kasp := keepalive.ServerParameters{
-	//	Time:    2 * time.Minute,
-	//	Timeout: 1 * time.Minute,
-	//}
-
-	//grpcServer := grpc.NewServer(
-	//	grpc.KeepaliveEnforcementPolicy(kaep),
-	//	grpc.KeepaliveParams(kasp),
-	//)
 	grpcServer := grpc.NewServer()
 	kanbanpb.RegisterKanbanServer(grpcServer, server)
 	log.Printf("Start Status kanban server:%d", env.GetServerPort())
@@ -83,37 +69,20 @@ func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanp
 		cancel()
 	}()
 
-	// create redis pool when recieve gRPC call is no reasonable in terms of speed.
-	// but we should do this becase must close connection to don't overflow block xread connection.
 	session := NewMicroserviceSession(srv.io, srv.env.GetDataDir(), req)
 
 	recvCh := make(chan *kanbanpb.StatusKanban)
-	errCh := make(chan error)
-	defer close(errCh)
-	go func() {
-		if err := session.StartKanbanWatcher(ctx, recvCh); err != nil {
-			log.Errorf("[ReceiveKanban] failed to stop watch kanban: %v", err)
-			errCh <- err
-		}
-	}()
+	go session.StartKanbanWatcher(ctx, recvCh)
 
 	// receive kanban from redis and send client microservice
 	log.Printf("[ReceiveKanban] startconnection: %s", req.MicroserviceName)
-	for {
-		select {
-		case res, ok := <-recvCh:
-			if !ok {
-				log.Printf("[ReceiveKanban] recvCh closed")
-				return nil
-			}
-			if err := stream.Send(res); err != nil {
-				log.Errorf("[ReceiveKanban] failed to send: %v", err)
-				return err
-			}
-		case err := <-errCh:
+	for res := range recvCh {
+		if err := stream.Send(res); err != nil {
+			log.Errorf("[ReceiveKanban] failed to send: %v", err)
 			return err
 		}
 	}
+	return nil
 }
 
 func (srv *Server) SendKanban(ctx context.Context, req *kanbanpb.Request) (*kanbanpb.Response, error) {

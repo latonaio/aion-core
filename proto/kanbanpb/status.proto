@@ -40,16 +40,21 @@ message SendKanban {
 }
 
 message FileInfo {
-    int32 size = 1;
+    int64 size = 1;
     int32 chunkCnt = 2;
     bytes hash = 3;
     string name = 4;
+    string relDir = 5;
 }
 
 message Chunk {
     bytes context = 1;
     string name = 2;
     int32 refNum = 3;
+}
+
+message StreamInfo {
+    int32 fileCount = 1;
 }
 
 enum UploadRequestCode {

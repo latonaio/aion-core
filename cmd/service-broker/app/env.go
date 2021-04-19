@@ -36,7 +36,6 @@ type EnvironmentValue struct {
 
 type FlagValue struct {
 	ConfigPath *string
-	IsDocker   *bool
 }
 
 func GetConfig() *Config {
@@ -47,7 +46,6 @@ func GetConfig() *Config {
 	}
 
 	conf.flag.ConfigPath = flag.String("c", "./yaml/sample.yml", "AION Config File")
-	conf.flag.IsDocker = flag.Bool("d", false, "use docker mode")
 	flag.Parse()
 
 	// check aion home
@@ -87,10 +85,6 @@ func (e *Config) GetNamespace() string {
 
 func (e *Config) GetRegistrySecret() string {
 	return e.env.RegistrySecret
-}
-
-func (e *Config) IsDocker() bool {
-	return *e.flag.IsDocker
 }
 
 func (e *Config) GetMode() Mode {

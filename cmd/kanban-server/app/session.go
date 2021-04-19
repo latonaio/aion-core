@@ -37,33 +37,14 @@ func newSession(io kanban.Adapter, msName string, msNumber int, dataPath string)
 }
 
 // start kanban watcher
-func (s *Session) StartKanbanWatcher(ctx context.Context, sendCh chan<- *kanbanpb.StatusKanban) error {
+func (s *Session) StartKanbanWatcher(ctx context.Context, sendCh chan<- *kanbanpb.StatusKanban) {
 
-	defer close(sendCh)
-	childCtx, cancel := context.WithCancel(ctx)
 	defer func() {
 		log.Printf("[KanbanWatcher] session closed (%s:%d)", s.microserviceName, s.processNumber)
-		cancel()
 	}()
-	ch := make(chan *kanbanpb.StatusKanban)
-	go s.io.WatchKanban(childCtx, ch, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
 
 	log.Printf("[KanbanWatcher] start session (%s:%d)", s.microserviceName, s.processNumber)
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("[KanbanWatcher] context closed")
-			return nil
-		case kanban, ok := <-ch:
-			if !ok {
-				log.Printf("[KanbanWatche] redis watcher closed")
-				return nil
-			}
-			log.Printf("[KanbanWatcher] success to read kanban: (ms:%s, number:%d)",
-				s.microserviceName, s.processNumber)
-			sendCh <- kanban
-		}
-	}
+	s.io.WatchKanban(ctx, sendCh, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
 }
 
 // set kanban from microservice

@@ -10,6 +10,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var addr string = "aion-sendanything:10000"
+
 // TODO: change file sender module to adapter pattern
 // for change to mqtt, etc...
 
@@ -19,13 +21,7 @@ type Controller struct {
 	sendCh chan *kanbanpb.SendKanban
 }
 
-func NewDeviceController(ctx context.Context, isDocker bool) (*Controller, error) {
-	var addr string
-	if isDocker {
-		addr = "aion-sendanything:10000"
-	} else {
-		addr = "localhost:11011"
-	}
+func NewDeviceController(ctx context.Context) (*Controller, error) {
 
 	c := &Controller{
 		addr:   addr,

@@ -26,7 +26,7 @@ func main() {
 	client := app.NewClient(ctx, env, redis)
 	client.StartWatchKanban(ctx, aionCh)
 
-	ya, err := config.LoadConfigFromDirectory(env.GetConfigPath(), true)
+	ya, err := config.LoadConfigFromDirectory(env.GetConfigPath())
 	if err != nil {
 		log.Fatal(err)
 
@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("cant start server")
 	}
 	s := grpc.NewServer()
-	server := services.NewProjectServer(aionCh, true, redis)
+	server := services.NewProjectServer(aionCh, redis)
 	pb.RegisterProjectServer(s, server)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("cant start server")
