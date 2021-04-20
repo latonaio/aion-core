@@ -114,6 +114,7 @@ func sendToOtherDeviceClient(ctx context.Context, m *kanbanpb.SendKanban, port i
 // send kanban to other devices
 func sendKanban(stream kanbanpb.SendAnything_SendToOtherDevicesClient, m *kanbanpb.SendKanban) error {
 	log.Printf("[SendToOtherDevices client] start to send kanban: %s", m.NextService)
+	LOG(m)
 	cont, err := anypb.New(m)
 	if err != nil {
 		return err
@@ -162,7 +163,6 @@ func sendFiles(stream kanbanpb.SendAnything_SendToOtherDevicesClient, filePaths 
 
 func takeFiles(relPathFrom string, pathsList ...[]string) (baggage.FilesInfo, error) {
 	files := make(baggage.FilesInfo, 0, len(pathsList))
-	LOG(pathsList)
 
 	for _, paths := range pathsList {
 		for _, path := range paths {
@@ -173,29 +173,22 @@ func takeFiles(relPathFrom string, pathsList ...[]string) (baggage.FilesInfo, er
 
 			info, err := os.Stat(path)
 			if err != nil {
-				LOG(err)
 				return nil, err
 			}
 
-			LOG("ok")
 			switch m := info.Mode(); {
 			case m.IsDir():
-				LOG("IS DIR")
 				fs, err := baggage.CreateFilesInfoByDir(path)
 				if err != nil {
-					LOG(err)
 					return nil, err
 				}
 				files = append(files, fs...)
-				LOG("ok")
 			case m.IsRegular():
-				LOG("IS FILE")
 				fs, err := baggage.CreateFileInfo(path)
 				if err != nil {
 					return nil, err
 				}
 				files = append(files, fs)
-				LOG("ok")
 			default:
 				return nil, fmt.Errorf("unknown FileSystem type")
 			}
@@ -216,21 +209,16 @@ func sendFile(stream kanbanpb.SendAnything_SendToOtherDevicesClient, file *bagga
 	if err != nil {
 		return err
 	}
-	LOG("FIN SEND FILE INFO")
 
 	chunkCnt, err := sendFileContent(stream, file)
 	if err != nil {
 		return err
 	}
 
-	LOG("FIN SEND FILE CONTENT")
-
 	err = sendFileEOF(stream, file, parentDir, chunkCnt)
 	if err != nil {
 		return err
 	}
-
-	LOG("FIN SEND FILE EOF")
 
 	log.Printf("[SendToOtherDevices client] finish to send file: %s", file.Name())
 	return nil
@@ -373,8 +361,8 @@ func sendEOS(stream kanbanpb.SendAnything_SendToOtherDevicesClient, fileCnt int)
 }
 
 func LOG(any ...interface{}) {
-	log.Println(any...)
-	return
+	// log.Println(any...)
+	// return
 	_, f, l, _ := runtime.Caller(1)
 	log.Printf("DEBUG from %s:%d", f, l)
 

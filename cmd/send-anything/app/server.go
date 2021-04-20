@@ -113,6 +113,7 @@ func (srv *Server) ServiceBrokerConn(stream kanbanpb.SendAnything_ServiceBrokerC
 func (srv *Server) SendToOtherDevices(stream kanbanpb.SendAnything_SendToOtherDevicesServer) error {
 	log.Printf("[SendToOtherDevices server] create connection")
 	message, code := srv.messageParserInSendAnythingServer(stream, srv.env.GetDataDir())
+	LOG(message)
 	resp := &kanbanpb.UploadStatus{
 		Message:    "[SendToOtherDevices server] " + message,
 		StatusCode: code,
@@ -133,6 +134,7 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 	fileInfo := &kanbanpb.FileInfo{}
 	fileBuilder := new(receivingFileBuilder)
 	receivedFileCnt := 0
+	outputFiles := []string{}
 
 	for {
 		// wait stream by client
@@ -147,6 +149,7 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 			if err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
+			outputFiles = make([]string, 0, len(kContainer.AfterKanban.FileList))
 		case kanbanpb.UploadRequestCode_SendingFile_Info:
 			fileInfo, fileBuilder, err = receiveFileInfo(in)
 			if err != nil {
@@ -157,13 +160,15 @@ func (srv *Server) messageParserInSendAnythingServer(stream kanbanpb.SendAnythin
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
 		case kanbanpb.UploadRequestCode_SendingFile_EOF:
-			if err = receiveEOF(in, fileInfo, fileBuilder, dirPath, &receivedFileCnt); err != nil {
+			if err = receiveEOF(in, fileInfo, fileBuilder, dirPath, &outputFiles, &receivedFileCnt); err != nil {
 				return err.Error(), kanbanpb.UploadStatusCode_Failed
 			}
+			LOG(outputFiles)
 		case kanbanpb.UploadRequestCode_EOS:
-			if err = receiveEOS(in, &receivedFileCnt); err != nil {
+			if err = receiveEOS(in, kContainer, &receivedFileCnt); err != nil {
 				return "enough files haven't received yet", kanbanpb.UploadStatusCode_Failed
 			}
+			kContainer.AfterKanban.FileList = outputFiles
 			srv.sendToServiceBrokerCh <- kContainer
 			return "all files are received", kanbanpb.UploadStatusCode_OK
 		default:
@@ -217,7 +222,7 @@ func receiveFileCont(dataContent *anypb.Any, file *receivingFileBuilder) error {
 	return nil
 }
 
-func receiveEOF(in *kanbanpb.SendContext, fInfo *kanbanpb.FileInfo, file *receivingFileBuilder, dirPath string, numOfOutputFile *int) error {
+func receiveEOF(in *kanbanpb.SendContext, fInfo *kanbanpb.FileInfo, file *receivingFileBuilder, dirPath string, outputFiles *[]string, numOfOutputFile *int) error {
 	file.expectRefefNum = 0
 	fInfoEOF := &kanbanpb.FileInfo{}
 	if err := ptypes.UnmarshalAny(in.Context, fInfoEOF); err != nil {
@@ -226,7 +231,6 @@ func receiveEOF(in *kanbanpb.SendContext, fInfo *kanbanpb.FileInfo, file *receiv
 	fileName := filepath.Base(fInfoEOF.Name)
 	outputDir := path.Join(dirPath, fInfoEOF.RelDir)
 	filePath := path.Join(outputDir, fileName)
-	LOG(fInfoEOF.RelDir)
 
 	if f, err := os.Stat(outputDir); os.IsNotExist(err) || !f.IsDir() {
 		if err := os.MkdirAll(outputDir, 0775); err != nil {
@@ -241,6 +245,7 @@ func receiveEOF(in *kanbanpb.SendContext, fInfo *kanbanpb.FileInfo, file *receiv
 	if _, err := f.Write(file.fileContent); err != nil {
 		return fmt.Errorf("cant write output file: %v", err)
 	}
+	*outputFiles = append(*outputFiles, filePath)
 
 	if string(fInfo.Hash) != getMD5(f) {
 		os.Remove(f.Name())
@@ -263,7 +268,7 @@ func getMD5(f *os.File) string {
 	return string(h.Sum(nil))
 }
 
-func receiveEOS(in *kanbanpb.SendContext, numOfOutputFile *int) error {
+func receiveEOS(in *kanbanpb.SendContext, kanban *kanbanpb.SendKanban, numOfOutputFile *int) error {
 	eos := &kanbanpb.StreamInfo{}
 	if err := ptypes.UnmarshalAny(in.Context, eos); err != nil {
 		return fmt.Errorf("cant unmarshal any, %v", err)
