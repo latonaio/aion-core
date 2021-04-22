@@ -8,13 +8,21 @@ import "google/protobuf/any.proto";
 service Kanban {
     // 最新のCカンバンを取得する
     rpc ReceiveKanban(InitializeService) returns (stream StatusKanban);
+    rpc ReceiveStaticKanban(Topic) returns (stream StaticKanban);
     rpc SendKanban(Request) returns (Response);
+    rpc SendStaticKanban(StaticRequest) returns (Response);
+    rpc DeleteStaticKanban(DeleteStaticRequest) returns (Response);
 }
 
 service SendAnything {
     rpc ServiceBrokerConn(stream SendKanban) returns (stream SendKanban);
     rpc SendToOtherDevices(stream SendContext) returns (UploadStatus);
 }
+
+message Topic {
+    string name = 1;
+}
+
 
 // Cカンバンデータ
 message StatusKanban {
@@ -27,6 +35,11 @@ message StatusKanban {
     string dataPath = 7;
     repeated string fileList = 8;
     google.protobuf.Struct metadata = 9;
+}
+
+message StaticKanban {
+    string id = 1;
+    StatusKanban statusKanban = 2;
 }
 
 // --------------------- Send Anything Server --------------------------
@@ -103,6 +116,16 @@ enum ResponseStatus {
 
 message Request {
     string microserviceName = 1;
+    StatusKanban message = 2;
+}
+
+message DeleteStaticRequest {
+    Topic topic = 1;
+    string id = 2;
+}
+
+message StaticRequest {
+    Topic topic = 1;
     StatusKanban message = 2;
 }
 

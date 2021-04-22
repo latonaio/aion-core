@@ -53,7 +53,7 @@ func (w *Watcher) WatchReceiveKanban(ctx context.Context, aionCh <-chan *config.
 			if !ok {
 				return
 			}
-			if err := w.WriteKanban(k.NextService, int(k.NextNumber), k.AfterKanban, kanban.StatusType_Before); err != nil {
+			if err := w.WriteKanban(kanban.GetStreamKeyByStatusType(k.NextService, int(k.NextNumber), kanban.StatusType_Before), k.AfterKanban); err != nil {
 				log.Errorf("[watcher: start microservice] %v", err)
 			}
 			w.startCh <- NewContainer(k.NextService, int(k.NextNumber))
@@ -67,8 +67,8 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 		log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
 		cancel()
 	}()
-	kanbanCh := make(chan *kanbanpb.StatusKanban)
-	go w.WatchKanban(childCtx, kanbanCh, msName, msNumber, kanban.StatusType_After, false)
+	kanbanCh := make(chan *kanban.AdaptorKanban)
+	go w.WatchKanban(childCtx, kanbanCh, kanban.GetStreamKeyByStatusType(msName, msNumber, kanban.StatusType_After), false)
 
 	log.Printf("[watcher] start watch microservice : %s-%03d\n", msName, msNumber)
 	for {
@@ -76,11 +76,12 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 		case <-ctx.Done():
 			log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
 			return
-		case k, ok := <-kanbanCh:
+		case ak, ok := <-kanbanCh:
 			if !ok {
 				log.Warnf("[watcher] watch kanban closed")
 				return
 			}
+			k := ak.Kanban
 			if k.ConnectionKey == serviceBrokerName {
 				serviceName, _, err := w.terminateServiceParser(k)
 				if err != nil {
@@ -114,7 +115,7 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 				} else {
 					// send to local microservice
 					k.NextDeviceName = w.aionSetting.GetDeviceName()
-					if err := w.WriteKanban(nextService.NextServiceName, number, k, kanban.StatusType_Before); err != nil {
+					if err := w.WriteKanban(kanban.GetStreamKeyByStatusType(nextService.NextServiceName, number, kanban.StatusType_Before), k); err != nil {
 						log.Errorf("[watcher: start microservice] %v", err)
 					}
 					w.startCh <- NewContainer(nextService.NextServiceName, number)

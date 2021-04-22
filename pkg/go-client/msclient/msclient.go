@@ -111,7 +111,10 @@ func SetDeviceName(n string) Option {
 type MicroserviceClient interface {
 	GetOneKanban() (*kanbanpb.StatusKanban, error)
 	GetKanbanCh() chan *kanbanpb.StatusKanban
+	GetStaticKanban(ctx context.Context, topic string, kanbanCh chan *kanbanpb.StaticKanban) error
 	OutputKanban(data *kanbanpb.StatusKanban) error
+	OutputStaticKanban(topic string, data *kanbanpb.StatusKanban) error
+	DeleteStaticKanban(topic string, id string) error
 	Close() error
 	GetProcessNumber() int
 }
@@ -141,7 +144,7 @@ func NewKanbanClient(ctx context.Context, serviceName string, initType kanbanpb.
 	var env Env
 	envconfig.Process("", &env)
 	if env.KanbanAddr == "" {
-		env.KanbanAddr = "localhost:11010"
+		env.KanbanAddr = "aion-statuskanban:10000" //statuskanbanのenvoy
 	}
 	if env.MsNumber < 1 {
 		env.MsNumber = 1
@@ -156,7 +159,6 @@ func NewKanbanClient(ctx context.Context, serviceName string, initType kanbanpb.
 	// connect to status-kanban server
 	recvConn, err := grpc.DialContext(ctx, env.KanbanAddr, grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
 	if err != nil {
-		recvConn.Close()
 		return nil, errors.Wrap(err, fmt.Sprintf("cannot connect to status kanban server: %s", env.KanbanAddr))
 	}
 
@@ -212,9 +214,9 @@ func (k *microserviceClient) sendRequest(req *kanbanpb.Request) error {
 		time.Second,
 	)
 	defer cancel()
-	res, err := k.sendClient.SendKanban(ctx, req)
+	_, err := k.sendClient.SendKanban(ctx, req)
 	if err != nil {
-		log.Errorf("cannot send kanban: %s, %v", res.Error, err)
+		log.Errorf("cannot send kanban:, %v", err)
 		return err
 	}
 	return nil
@@ -238,6 +240,41 @@ func (k *microserviceClient) GetKanbanCh() chan *kanbanpb.StatusKanban {
 	return k.recvKanbanCh
 }
 
+func (k *microserviceClient) GetStaticKanban(ctx context.Context, topic string, kanbanCh chan *kanbanpb.StaticKanban) error {
+	defer close(kanbanCh)
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second,
+		Timeout:             10 * time.Second,
+		PermitWithoutStream: true,
+	}
+
+	recvConn, err := grpc.DialContext(ctx, k.env.KanbanAddr, grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("cannot connect to status kanban server: %s", k.env.KanbanAddr))
+	}
+	defer recvConn.Close()
+	recvClient := kanbanpb.NewKanbanClient(recvConn)
+	initMsg := &kanbanpb.Topic{Name: topic}
+	stream, err := recvClient.ReceiveStaticKanban(ctx, initMsg)
+	if err != nil {
+		recvConn.Close()
+		return errors.Wrap(err, fmt.Sprintf("cannot connect to status kanban server: %s", k.env.KanbanAddr))
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			m, err := stream.Recv()
+			if err != nil {
+				log.Printf("connection with kanban server is closed: %v", err)
+				return nil
+			}
+			kanbanCh <- m
+		}
+	}
+}
+
 // OutputKanban outputs request to kanban.
 func (k *microserviceClient) OutputKanban(data *kanbanpb.StatusKanban) error {
 
@@ -251,8 +288,46 @@ func (k *microserviceClient) OutputKanban(data *kanbanpb.StatusKanban) error {
 	return nil
 }
 
+func (k *microserviceClient) OutputStaticKanban(topic string, data *kanbanpb.StatusKanban) error {
+
+	req := &kanbanpb.StaticRequest{
+		Topic:   &kanbanpb.Topic{Name: topic},
+		Message: data,
+	}
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+	_, err := k.sendClient.SendStaticKanban(ctx, req)
+	if err != nil {
+		log.Errorf("cannot send static kanban:, %v", err)
+		return err
+	}
+	return nil
+}
+
+func (k *microserviceClient) DeleteStaticKanban(topic string, id string) error {
+
+	req := &kanbanpb.DeleteStaticRequest{
+		Topic: &kanbanpb.Topic{Name: topic},
+		Id:    id,
+	}
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+	_, err := k.sendClient.DeleteStaticKanban(ctx, req)
+	if err != nil {
+		log.Errorf("cannot delete kanban:, %v", err)
+		return err
+	}
+	return nil
+}
+
 func (k *microserviceClient) sendTerminateKanban() error {
-	var metadata map[string]string
+	metadata := map[string]string{}
 	metadata["type"] = "terminate"
 	metadata["number"] = strconv.Itoa(k.env.MsNumber)
 	metadata["name"] = k.serviceName

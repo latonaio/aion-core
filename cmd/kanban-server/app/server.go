@@ -71,14 +71,35 @@ func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanp
 
 	session := NewMicroserviceSession(srv.io, srv.env.GetDataDir(), req)
 
-	recvCh := make(chan *kanbanpb.StatusKanban)
+	recvCh := make(chan *kanban.AdaptorKanban)
 	go session.StartKanbanWatcher(ctx, recvCh)
 
 	// receive kanban from redis and send client microservice
 	log.Printf("[ReceiveKanban] startconnection: %s", req.MicroserviceName)
 	for res := range recvCh {
-		if err := stream.Send(res); err != nil {
+		if err := stream.Send(res.Kanban); err != nil {
 			log.Errorf("[ReceiveKanban] failed to send: %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (srv *Server) ReceiveStaticKanban(req *kanbanpb.Topic, stream kanbanpb.Kanban_ReceiveStaticKanbanServer) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		log.Printf("[ReceiveStaticKanban] connection closed: %s", req.Name)
+		cancel()
+	}()
+
+	recvCh := make(chan *kanban.AdaptorKanban)
+	go srv.io.WatchKanban(ctx, recvCh, kanban.GetStaticStreamKey(req.Name), true)
+
+	// receive kanban from redis and send client microservice
+	log.Printf("[ReceiveStaticKanban] startconnection: %s", req.Name)
+	for res := range recvCh {
+		if err := stream.Send(&kanbanpb.StaticKanban{Id: res.ID, StatusKanban: res.Kanban}); err != nil {
+			log.Errorf("[ReceiveStaticKanban] failed to send: %v", err)
 			return err
 		}
 	}
@@ -87,15 +108,49 @@ func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanp
 
 func (srv *Server) SendKanban(ctx context.Context, req *kanbanpb.Request) (*kanbanpb.Response, error) {
 	if err := srv.io.WriteKanban(
-		req.MicroserviceName,
-		int(req.Message.ProcessNumber),
+		kanban.GetStreamKeyByStatusType(req.MicroserviceName, int(req.Message.ProcessNumber), kanban.StatusType_After),
 		req.Message,
-		kanban.StatusType_After,
 	); err != nil {
 		log.Errorf("[SendKanban] failed to write kanban")
 		return &kanbanpb.Response{
 			Status: kanbanpb.ResponseStatus_FAILED,
 			Error:  fmt.Sprintf("cannot write kanban: %v", err),
+		}, err
+	}
+
+	return &kanbanpb.Response{
+		Status: kanbanpb.ResponseStatus_SUCCESS,
+		Error:  "",
+	}, nil
+}
+
+func (srv *Server) SendStaticKanban(ctx context.Context, req *kanbanpb.StaticRequest) (*kanbanpb.Response, error) {
+	if err := srv.io.WriteKanban(
+		kanban.GetStaticStreamKey(req.Topic.Name),
+		req.Message,
+	); err != nil {
+		log.Errorf("[SendStaticKanban] failed to write kanban")
+		return &kanbanpb.Response{
+			Status: kanbanpb.ResponseStatus_FAILED,
+			Error:  fmt.Sprintf("cannot write kanban: %v", err),
+		}, err
+	}
+
+	return &kanbanpb.Response{
+		Status: kanbanpb.ResponseStatus_SUCCESS,
+		Error:  "",
+	}, nil
+}
+
+func (srv *Server) DeleteStaticKanban(ctx context.Context, req *kanbanpb.DeleteStaticRequest) (*kanbanpb.Response, error) {
+	if err := srv.io.DeleteKanban(
+		kanban.GetStaticStreamKey(req.Topic.Name),
+		req.Id,
+	); err != nil {
+		log.Errorf("[DeleteStaticKanban] failed to delete kanban")
+		return &kanbanpb.Response{
+			Status: kanbanpb.ResponseStatus_FAILED,
+			Error:  fmt.Sprintf("cannot delete kanban: %v", err),
 		}, err
 	}
 

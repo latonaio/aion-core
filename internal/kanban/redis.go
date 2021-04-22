@@ -23,27 +23,6 @@ type RedisAdaptor struct {
 	redis *my_redis.RedisClient
 }
 
-func getBeforeStreamKey(msName string, number int) string {
-	return strings.Join([]string{
-		"kanban", "before", msName, fmt.Sprintf("%03d", number)}, ":")
-}
-
-func getAfterStreamKey(msName string, number int) string {
-	return strings.Join([]string{
-		"kanban", "after", msName, fmt.Sprintf("%03d", number)}, ":")
-}
-
-func getStreamKeyByStatusType(msName string, msNumber int, statusType StatusType) string {
-	switch statusType {
-	case StatusType_Before:
-		return getBeforeStreamKey(msName, msNumber)
-	case StatusType_After:
-		return getAfterStreamKey(msName, msNumber)
-	default:
-		return ""
-	}
-}
-
 func unmarshalKanban(hash map[string]interface{}) (*kanbanpb.StatusKanban, error) {
 	str, ok := hash["kanban"].(string)
 	if !ok {
@@ -59,8 +38,7 @@ func unmarshalKanban(hash map[string]interface{}) (*kanbanpb.StatusKanban, error
 	return k, nil
 }
 
-func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb.StatusKanban, statusType StatusType) error {
-	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
+func (a *RedisAdaptor) WriteKanban(streamKey string, kanban *kanbanpb.StatusKanban) error {
 
 	m := jsonpb.Marshaler{}
 	kanbanJson, err := m.MarshalToString(kanban)
@@ -75,14 +53,13 @@ func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb
 	return nil
 }
 
-func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanpb.StatusKanban, msName string, msNumber int, statusType StatusType, deleteOldKanban bool) {
+func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *AdaptorKanban, streamKey string, deleteOldKanban bool) {
 	defer func() {
-		log.Printf("[watch kanban] stop watch kanban %s:%d", msName, msNumber)
+		log.Printf("[watch kanban] stop watch kanban :%s", streamKey)
 		close(kanbanCh)
 	}()
 
 	prevID := initPrevID
-	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
 	for {
 		select {
 		case <-ctx.Done():
@@ -107,7 +84,15 @@ func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanp
 				continue
 			}
 			log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
-			kanbanCh <- k
+			kanbanCh <- &AdaptorKanban{ID: prevID, Kanban: k}
 		}
 	}
+}
+
+func (a *RedisAdaptor) DeleteKanban(streamKey string, id string) error {
+	if err := a.redis.XDel(streamKey, []string{id}); err != nil {
+		log.Errorf("[delete kanban] cannot delete kanban: (%s:%s)", streamKey, id)
+		return err
+	}
+	return nil
 }

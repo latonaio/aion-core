@@ -37,14 +37,14 @@ func newSession(io kanban.Adapter, msName string, msNumber int, dataPath string)
 }
 
 // start kanban watcher
-func (s *Session) StartKanbanWatcher(ctx context.Context, sendCh chan<- *kanbanpb.StatusKanban) {
+func (s *Session) StartKanbanWatcher(ctx context.Context, sendCh chan<- *kanban.AdaptorKanban) {
 
 	defer func() {
 		log.Printf("[KanbanWatcher] session closed (%s:%d)", s.microserviceName, s.processNumber)
 	}()
 
 	log.Printf("[KanbanWatcher] start session (%s:%d)", s.microserviceName, s.processNumber)
-	s.io.WatchKanban(ctx, sendCh, s.microserviceName, s.processNumber, kanban.StatusType_Before, true)
+	s.io.WatchKanban(ctx, sendCh, kanban.GetStreamKeyByStatusType(s.microserviceName, s.processNumber, kanban.StatusType_Before), true)
 }
 
 // set kanban from microservice
@@ -59,7 +59,7 @@ func (s *Session) setKanban() error {
 		Metadata:      &_struct.Struct{},
 	}
 
-	if err := s.io.WriteKanban(s.microserviceName, s.processNumber, k, kanban.StatusType_Before); err != nil {
+	if err := s.io.WriteKanban(kanban.GetStreamKeyByStatusType(s.microserviceName, s.processNumber, kanban.StatusType_Before), k); err != nil {
 		log.Errorf("cannot create initial kanban: %v", err)
 		return err
 	}

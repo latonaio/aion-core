@@ -34,8 +34,8 @@ func newWatcher(io kanban.Adapter) *Watcher {
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int, statusType kanban.StatusType) {
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	kanbanCh := make(chan *kanbanpb.StatusKanban)
-	go w.WatchKanban(childCtx, kanbanCh, msName, msNumber, statusType, false)
+	kanbanCh := make(chan *kanban.AdaptorKanban)
+	go w.WatchKanban(childCtx, kanbanCh, kanban.GetStreamKeyByStatusType(msName, msNumber, statusType), false)
 
 	streamKey := getStreamKey(msName, msNumber, statusType)
 	for {
@@ -46,7 +46,7 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 			if !ok {
 				return
 			}
-			w.WriteKanbanMongo(ctx, k, streamKey)
+			w.WriteKanbanMongo(ctx, k.Kanban, streamKey)
 		}
 	}
 }
