@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 
@@ -80,7 +79,7 @@ func (f *FileInfo) Dir() string {
 }
 
 func (f *FileInfo) Path() string {
-	return path.Join(f.fileDir, f.fileName)
+	return filepath.Join(f.fileDir, f.fileName)
 }
 
 func (f *FileInfo) Size() int64 {

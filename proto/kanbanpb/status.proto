@@ -52,12 +52,28 @@ message SendKanban {
     StatusKanban afterKanban = 5;
 }
 
+// FileInfo
+// ディレクトリ情報を残すのであれば、relDirに相対パスを入れる。
+// ファイルのみの送信時、保存先は $AION_HOME/RelDir/name となる。
 message FileInfo {
     int64 size = 1;
     int32 chunkCnt = 2;
     bytes hash = 3;
     string name = 4;
     string relDir = 5;
+}
+
+// DirInfo
+// filesのrelPathには、送信ディレクトリからの相対パスを入れる。
+// 送信ディレクトリ自体のディレクトリ情報を残すのであれば、
+// relParentDirに相対パスを入れる。
+// 保存先は、$AION_HOME/RelParentPath/DirName/FileInfo.RelDir/FileInfo.name
+// となる。
+message DirInfo {
+    int64 fileCnt = 1;
+    string dirName = 2;
+    string relParentPath = 3;
+    repeated FileInfo files = 4;
 }
 
 message Chunk {
@@ -78,6 +94,11 @@ enum UploadRequestCode {
     EOS = 4;
 
     SendingFile_Info = 5;
+    EndOfSendingFile = 6;
+    SendingDirInfo = 7;
+    EndOfSendingDir = 8;
+
+    SendingStatus = 9;
 }
 
 message SendContext {
