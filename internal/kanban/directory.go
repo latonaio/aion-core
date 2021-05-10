@@ -1,20 +1,21 @@
 package kanban
 
 import (
-	"bitbucket.org/latonaio/aion-core/pkg/common"
-	"bitbucket.org/latonaio/aion-core/pkg/fswatcher"
-	"bitbucket.org/latonaio/aion-core/pkg/log"
-	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"context"
 	"fmt"
-	"github.com/avast/retry-go"
-	"github.com/golang/protobuf/jsonpb"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"bitbucket.org/latonaio/aion-core/pkg/common"
+	"bitbucket.org/latonaio/aion-core/pkg/fswatcher"
+	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
+	"github.com/avast/retry-go"
+	"github.com/golang/protobuf/jsonpb"
 )
 
 func NewFileAdapter(aionDataPath string) Adapter {
@@ -51,45 +52,44 @@ func convertStatusType(statusType StatusType) string {
 	}
 }
 
-func (fa *FileAdapter) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (<-chan *kanbanpb.StatusKanban, error) {
+func (fa *FileAdapter) WatchKanban(ctx context.Context, kanbanCh chan<- *kanbanpb.StatusKanban, msName string, msNumber int, statusType StatusType, deleteOldKanban bool) {
 	dataPath, err := fa.getPath(msName, msNumber, true)
 	if err != nil {
-		return nil, fmt.Errorf("cant watch kanban, because directory does not exist: %s", dataPath)
+		log.Errorf("cant watch kanban, because directory does not exist: %s", dataPath)
+		close(kanbanCh)
+		return
 	}
 
 	// set watcher
 	watcher, err := fswatcher.NewCreateWatcher()
 	if err != nil {
-		return nil, err
+		log.Errorf("%v", err)
+		close(kanbanCh)
+		return
 	}
 
 	// start file Watcher
 	watcher.AddDirectory(dataPath)
 	fa.watcher = watcher
 
-	resCh := make(chan *kanbanpb.StatusKanban)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				close(resCh)
-				return
-			case kanbanPath := <-watcher.GetFilePathCh():
-				if strings.Split(path.Base(kanbanPath), "_")[0] != convertStatusType(statusType) {
-					continue
-				}
-				kanban, err := fa.readKanban(msName, msNumber, statusType)
-				if err != nil {
-					log.Printf("cant get kanban: %v", err)
-					continue
-				}
-				resCh <- kanban
-			}
-		}
-	}()
-
 	log.Printf("Start Watch Microservice: %s", dataPath)
-	return resCh, nil
+	for {
+		select {
+		case <-ctx.Done():
+			close(kanbanCh)
+			return
+		case kanbanPath := <-watcher.GetFilePathCh():
+			if strings.Split(path.Base(kanbanPath), "_")[0] != convertStatusType(statusType) {
+				continue
+			}
+			kanban, err := fa.readKanban(msName, msNumber, statusType)
+			if err != nil {
+				log.Printf("cant get kanban: %v", err)
+				continue
+			}
+			kanbanCh <- kanban
+		}
+	}
 }
 
 func (fa *FileAdapter) readKanban(msName string, msNumber int, statusType StatusType) (*kanbanpb.StatusKanban, error) {
