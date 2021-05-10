@@ -1,13 +1,17 @@
 syntax = "proto3";
 
 package kanbanpb;
-
+option go_package = "bitbucket.org/latonaio/aion-core/proto/kanbanpb";
 import "google/protobuf/struct.proto";
 import "google/protobuf/any.proto";
 
 service Kanban {
     // 最新のCカンバンを取得する
-    rpc MicroserviceConn(stream Request) returns (stream Response);
+    rpc ReceiveKanban(InitializeService) returns (stream StatusKanban);
+    rpc ReceiveStaticKanban(Topic) returns (stream StaticKanban);
+    rpc SendKanban(Request) returns (Response);
+    rpc SendStaticKanban(StaticRequest) returns (Response);
+    rpc DeleteStaticKanban(DeleteStaticRequest) returns (Response);
 }
 
 service SendAnything {
@@ -15,11 +19,16 @@ service SendAnything {
     rpc SendToOtherDevices(stream SendContext) returns (UploadStatus);
 }
 
+message Topic {
+    string name = 1;
+}
+
+
 // Cカンバンデータ
 message StatusKanban {
     string startAt = 1;
     string finishAt = 2;
-    repeated ServiceData services = 3;
+    string nextDeviceName = 3;
     string connectionKey = 4;
     int32 processNumber = 5;
     bool priorSuccess = 6;
@@ -28,9 +37,9 @@ message StatusKanban {
     google.protobuf.Struct metadata = 9;
 }
 
-message ServiceData {
-    string name = 1;
-    string device = 2;
+message StaticKanban {
+    string id = 1;
+    StatusKanban statusKanban = 2;
 }
 
 // --------------------- Send Anything Server --------------------------
@@ -43,16 +52,53 @@ message SendKanban {
     StatusKanban afterKanban = 5;
 }
 
+// FileInfo
+// ディレクトリ情報を残すのであれば、relDirに相対パスを入れる。
+// ファイルのみの送信時、保存先は $AION_HOME/RelDir/name となる。
+message FileInfo {
+    int64 size = 1;
+    int32 chunkCnt = 2;
+    bytes hash = 3;
+    string name = 4;
+    string relDir = 5;
+}
+
+// DirInfo
+// filesのrelPathには、送信ディレクトリからの相対パスを入れる。
+// 送信ディレクトリ自体のディレクトリ情報を残すのであれば、
+// relParentDirに相対パスを入れる。
+// 保存先は、$AION_HOME/RelParentPath/DirName/FileInfo.RelDir/FileInfo.name
+// となる。
+message DirInfo {
+    int64 fileCnt = 1;
+    string dirName = 2;
+    string relParentPath = 3;
+    repeated FileInfo files = 4;
+}
+
 message Chunk {
     bytes context = 1;
     string name = 2;
+    int32 refNum = 3;
+}
+
+message StreamInfo {
+    int32 fileCount = 1;
 }
 
 enum UploadRequestCode {
     SendingKanban = 0;
     SendingFile_CONT = 1;
     SendingFile_EOF = 2;
-    EOS = 3;
+    SendingFile_FAILED = 3;
+    EOS = 4;
+
+    SendingFile_Info = 5;
+    EndOfSendingFile = 6;
+    SendingDirInfo = 7;
+    EndOfSendingDir = 8;
+
+    SendingStatus = 9;
 }
 
 message SendContext {
@@ -74,45 +120,37 @@ message UploadStatus {
 // --------------------- Status Kanban Server ---------------------------
 // サービス起動時通知
 message InitializeService {
-    string microserviceName = 1;
-    int32 processNumber = 2;
+    InitializeType initType = 1;
+    string microserviceName = 2;
+    int32 processNumber = 3;
 }
 
-// サービス起動時通知（マイクロサービからカンバン取得[for debug] )
-message InitializeServiceWithKanban{
-    string microserviceName = 1;
-    StatusKanban cacheKanban = 2;
-}
-
-// microserviceの実行結果
-message OutputRequest {
-    bool priorSuccess = 1;
-    string dataPath = 2;
-    string connectionKey = 3;
-    int32 processNumber = 4;
-    repeated string fileList = 5;
-    google.protobuf.Struct metadata = 6;
-    string deviceName = 7;
-}
-
-enum RequestType {
+enum InitializeType {
     START_SERVICE = 0;
     START_SERVICE_WITHOUT_KANBAN = 1;
-    OUTPUT_AFTER_KANBAN = 2;
 }
 
-enum ResponseType {
-    RES_CACHE_KANBAN = 0;
-    RES_REQUEST_RESULT = 1;
+enum ResponseStatus {
+    SUCCESS = 0;
+    FAILED = 1;
 }
 
 message Request {
-    RequestType messageType = 1;
-    google.protobuf.Any message = 2;
+    string microserviceName = 1;
+    StatusKanban message = 2;
+}
+
+message DeleteStaticRequest {
+    Topic topic = 1;
+    string id = 2;
+}
+
+message StaticRequest {
+    Topic topic = 1;
+    StatusKanban message = 2;
 }
 
 message Response {
-    ResponseType messageType = 1;
-    google.protobuf.Any message = 2;
-    string error = 3;
+    ResponseStatus status = 1;
+    string error = 2;
 }

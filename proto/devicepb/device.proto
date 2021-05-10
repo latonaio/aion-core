@@ -1,7 +1,6 @@
 syntax = "proto3";
-
 package devicepb;
-
+option go_package = "bitbucket.org/latonaio/aion-core/proto/devicepb";
 message Device {
     string Addr = 1;
     int32 SSHPort = 2;

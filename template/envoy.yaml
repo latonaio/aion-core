@@ -28,6 +28,8 @@ static_resources:
                             prefix: "/"
                           route:
                             cluster: microservice_grpc
+                            timeout: 0s
+                            idle_timeout: 0s
                 http_filters:
                   - name: envoy.filters.http.grpc_http1_bridge
                     typed_config: {}

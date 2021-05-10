@@ -2,11 +2,10 @@
 package config
 
 import (
-	"fmt"
-
 	"bitbucket.org/latonaio/aion-core/proto/devicepb"
 	"bitbucket.org/latonaio/aion-core/proto/projectpb"
 	"bitbucket.org/latonaio/aion-core/proto/servicepb"
+	"fmt"
 )
 
 type ServiceConfigContainer interface {
@@ -14,6 +13,7 @@ type ServiceConfigContainer interface {
 	GetMicroserviceByName(name string) (*Microservice, error)
 	GetNextServiceList(name string, connectionKey string) ([]*NextServiceSetting, error)
 	GetDeviceName() string
+	GetDebug() string
 	GetDeviceList() map[string]*Device
 }
 
@@ -41,6 +41,10 @@ type PortConfig = servicepb.PortConfig
 
 type NextServiceSetting = servicepb.NextServiceSetting
 
+type Resources = servicepb.Resources
+
+type ResourceConfig = servicepb.ResourceConfig
+
 type Device = devicepb.Device
 
 const (
@@ -66,7 +70,7 @@ func GetNextNumber(
 	}
 }
 
-func LoadConfigFromDirectory(configPath string, isDocker bool) (*AionSetting, error) {
+func LoadConfigFromDirectory(configPath string) (*AionSetting, error) {
 	/*
 	 * 本来ならProtocol Bufferで定義されたモデルをそのまま使うべきだが、
 	 * 既存のproject.yamlがProtocol Buffetで表現できない
@@ -79,15 +83,15 @@ func LoadConfigFromDirectory(configPath string, isDocker bool) (*AionSetting, er
 		return nil, err
 	}
 	aionSetting := &AionSetting{aion}
-	if err := aionSetting.setInitializeValue(isDocker); err != nil {
+	if err := aionSetting.setInitializeValue(); err != nil {
 		return nil, err
 	}
 	return aionSetting, nil
 }
 
-func LoadConfigFromGRPC(project *projectpb.AionSetting, isDocker bool) (*AionSetting, error) {
+func LoadConfigFromGRPC(project *projectpb.AionSetting) (*AionSetting, error) {
 	aionSetting := &AionSetting{Aion: project}
-	if err := aionSetting.setInitializeValue(isDocker); err != nil {
+	if err := aionSetting.setInitializeValue(); err != nil {
 		return nil, err
 	}
 	return aionSetting, nil
@@ -124,11 +128,15 @@ func (ya *AionSetting) GetDeviceName() string {
 	return ya.Aion.DeviceName
 }
 
+func (ya *AionSetting) GetDebug() string {
+	return ya.Aion.Debug
+}
+
 func (ya *AionSetting) GetDeviceList() map[string]*Device {
 	return ya.Aion.Devices
 }
 
-func (ya *AionSetting) setInitializeValue(isDocker bool) error {
+func (ya *AionSetting) setInitializeValue() error {
 	for _, val := range ya.Aion.Devices {
 		if val.AionHome == "" {
 			val.AionHome = DefaultAionHome
@@ -168,9 +176,6 @@ func (ya *AionSetting) setInitializeValue(isDocker bool) error {
 		}
 		if msData.Tag == "" {
 			msData.Tag = DefaultTag
-		}
-		if isDocker {
-			msData.Docker = !msData.Docker
 		}
 
 		for _, nextKey := range msData.NextService {

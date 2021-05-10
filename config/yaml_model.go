@@ -4,17 +4,17 @@ import (
 	"io/ioutil"
 	"os"
 
-	"gopkg.in/yaml.v2"
-
 	"bitbucket.org/latonaio/aion-core/proto/devicepb"
 	"bitbucket.org/latonaio/aion-core/proto/projectpb"
 	"bitbucket.org/latonaio/aion-core/proto/servicepb"
+	"gopkg.in/yaml.v2"
 )
 
 type YamlAionSetting struct {
 	Microservices map[string]*YamlMicroservice `yaml:""`
 	Devices       map[string]*YamlDevice       `yaml:",omitempty"`
 	DeviceName    string                       `yaml:"deviceName,omitempty"`
+	Debug         string                       `yaml:"debug,omitempty"`
 }
 
 type YamlDevice struct {
@@ -33,7 +33,6 @@ type YamlMicroservice struct {
 	Position            string                        `yaml:",omitempty"`
 	Always              bool                          `yaml:",omitempty"`
 	Multiple            bool                          `yaml:",omitempty"`
-	Docker              bool                          `yaml:",omitempty"`
 	Startup             bool                          `yaml:",omitempty"`
 	Interval            int32                         `yaml:",omitempty"`
 	Ports               []*YamlPortConfig             `yaml:",omitempty"`
@@ -45,6 +44,7 @@ type YamlMicroservice struct {
 	Privileged          bool                          `yaml:",omitempty"`
 	WithoutKanban       bool                          `yaml:"withoutKanban,omitempty"`
 	TargetNode          string                        `yaml:"targetNode,omitempty"`
+	Resources           *YamlResources                `yaml:",omitempty"`
 }
 
 type YamlPortConfig struct {
@@ -58,6 +58,16 @@ type YamlNextService struct {
 	NextServiceName string `yaml:"name,omitempty"`
 	NumberPattern   string `yaml:"pattern,omitempty"`
 	NextDevice      string `yaml:"device,omitempty"`
+}
+
+type YamlResources struct {
+	Requests *YamlResourceConfig `yaml:",omitempty"`
+	Limits   *YamlResourceConfig `yaml:",omitempty"`
+}
+
+type YamlResourceConfig struct {
+	Memory string `yaml:",omitempty"`
+	Cpu    string `yaml:",omitempty"`
 }
 
 func LoadConfigFromFile(filePath string) (*projectpb.AionSetting, error) {
@@ -102,7 +112,6 @@ func (as *YamlAionSetting) mapToGRPCAionSetting() *projectpb.AionSetting {
 			m.Position = value.Position
 			m.Always = value.Always
 			m.Multiple = value.Multiple
-			m.Docker = value.Docker
 			m.Startup = value.Startup
 			m.Interval = value.Interval
 			m.DirPath = value.DirPath
@@ -136,9 +145,26 @@ func (as *YamlAionSetting) mapToGRPCAionSetting() *projectpb.AionSetting {
 					m.Ports = append(m.Ports, p)
 				}
 			}
+			if value.Resources != nil {
+				r := &servicepb.Resources{}
+				if value.Resources.Requests != nil {
+					rr := &ResourceConfig{}
+					rr.Memory = value.Resources.Requests.Memory
+					rr.Cpu = value.Resources.Requests.Cpu
+					r.Requests = rr
+				}
+				if value.Resources.Limits != nil {
+					rl := &ResourceConfig{}
+					rl.Memory = value.Resources.Limits.Memory
+					rl.Cpu = value.Resources.Limits.Cpu
+					r.Limits = rl
+				}
+				m.Resources = r
+			}
 			grpcAionSetting.Microservices[key] = m
 		}
 	}
 	grpcAionSetting.DeviceName = as.DeviceName
+	grpcAionSetting.Debug = as.Debug
 	return grpcAionSetting
 }

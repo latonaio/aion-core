@@ -13,27 +13,25 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 
+	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 )
 
 type Server struct {
-	env     *Env
-	isRedis bool
+	env *Env
+	io  kanban.Adapter
 }
 
 // connect to redis server and start grpc server
 func NewServer(env *Env) error {
 	server := &Server{
-		env:     env,
-		isRedis: true,
+		env: env,
+		io:  kanban.NewRedisAdapter(my_redis.NewRedisClient(env.GetRedisAddr())),
 	}
 
 	// start grpc server
@@ -42,12 +40,7 @@ func NewServer(env *Env) error {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
 
-	kaep := keepalive.EnforcementPolicy{
-		MinTime:             5 * time.Minute,
-		PermitWithoutStream: true,
-	}
-
-	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep))
+	grpcServer := grpc.NewServer()
 	kanbanpb.RegisterKanbanServer(grpcServer, server)
 	log.Printf("Start Status kanban server:%d", env.GetServerPort())
 
@@ -69,102 +62,100 @@ func NewServer(env *Env) error {
 	}
 }
 
-// callback function when receive message from microservice
-func (srv *Server) MicroserviceConn(stream kanbanpb.Kanban_MicroserviceConnServer) error {
-	ctx := stream.Context()
-	log.Printf("connect from microservice")
-
-	var session *Session
-	// create redis pool when recieve gRPC call is no reasonable in terms of speed.
-	// but we should do this becase must close connection to don't overflow block xread connection.
-	if err := my_redis.GetInstance().CreatePool(srv.env.GetRedisAddr()); err != nil {
-		log.Printf("cant connect to redis, use directory mode: %v", err)
-		session = NewMicroserviceSessionWithFile(srv.env.GetAionHome())
-		srv.isRedis = false
-	} else {
-		session = NewMicroserviceSessionWithRedis()
-	}
-
-	session.dataPath = srv.env.GetDataDir()
-
-	// get message from client
-	// and then parse message type
-	go func() {
-		for {
-			in, err := stream.Recv()
-			if err != nil {
-				log.Printf("receive stream is closed: %v", err)
-				return
-			}
-			res, err := parseRequestMessage(ctx, session, in)
-			if err != nil {
-				res.Error = err.Error()
-			}
-			if res != nil {
-				if err := stream.Send(res); err != nil {
-					log.Printf("grpc send error: %v", err)
-				}
-			}
-		}
+func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanpb.Kanban_ReceiveKanbanServer) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		log.Printf("[ReceiveKanban] connection closed: %s", req.MicroserviceName)
+		cancel()
 	}()
 
-	// loop of send channel to microservice
-	go func() {
-		for res := range session.sendCh {
-			if res.Error != "" {
-				log.Printf("grpc server error: %s", res.Error)
-			}
-			if err := stream.Send(res); err != nil {
-				log.Printf("grpc send error: %v", err)
-			}
-			log.Printf("send message to microservice (name: %s, number: %d, message type: %s)",
-				session.microserviceName, session.processNumber, res.MessageType)
-		}
-	}()
+	session := NewMicroserviceSession(srv.io, srv.env.GetDataDir(), req)
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("connection closed")
-			return nil
+	recvCh := make(chan *kanban.AdaptorKanban)
+	go session.StartKanbanWatcher(ctx, recvCh)
+
+	// receive kanban from redis and send client microservice
+	log.Printf("[ReceiveKanban] startconnection: %s", req.MicroserviceName)
+	for res := range recvCh {
+		if err := stream.Send(res.Kanban); err != nil {
+			log.Errorf("[ReceiveKanban] failed to send: %v", err)
+			return err
 		}
 	}
+	return nil
 }
 
-func parseRequestMessage(ctx context.Context, session *Session, m *kanbanpb.Request) (*kanbanpb.Response, error) {
-	switch m.MessageType {
-	case kanbanpb.RequestType_START_SERVICE:
-		p := &kanbanpb.InitializeService{}
-		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return nil, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
-		}
-		if err := session.StartKanbanWatcher(ctx, p); err != nil {
-			log.Printf("cant start kanban watcher: %v", err)
-			return nil, err
-		}
-		return nil, nil
+func (srv *Server) ReceiveStaticKanban(req *kanbanpb.Topic, stream kanbanpb.Kanban_ReceiveStaticKanbanServer) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		log.Printf("[ReceiveStaticKanban] connection closed: %s", req.Name)
+		cancel()
+	}()
 
-	case kanbanpb.RequestType_START_SERVICE_WITHOUT_KANBAN:
-		p := &kanbanpb.InitializeService{}
-		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return nil, fmt.Errorf("failer unmarshal message in set next service request: %v", err)
-		}
-		res := session.SetKanban(p)
-		if err := session.StartKanbanWatcher(ctx, p); err != nil {
-			log.Printf("cant start kanban watcher: %v", err)
-			return nil, err
-		}
-		return res, nil
+	recvCh := make(chan *kanban.AdaptorKanban)
+	go srv.io.WatchKanban(ctx, recvCh, kanban.GetStaticStreamKey(req.Name), true)
 
-	case kanbanpb.RequestType_OUTPUT_AFTER_KANBAN:
-		p := &kanbanpb.OutputRequest{}
-		if err := ptypes.UnmarshalAny(m.Message, p); err != nil {
-			return nil, fmt.Errorf("failed unmarshal message in set next service request: %v", err)
+	// receive kanban from redis and send client microservice
+	log.Printf("[ReceiveStaticKanban] startconnection: %s", req.Name)
+	for res := range recvCh {
+		if err := stream.Send(&kanbanpb.StaticKanban{Id: res.ID, StatusKanban: res.Kanban}); err != nil {
+			log.Errorf("[ReceiveStaticKanban] failed to send: %v", err)
+			return err
 		}
-		res := session.OutputKanban(p)
-		return res, nil
-
-	default:
-		return nil, fmt.Errorf("message type is not defined: %s", m.MessageType)
 	}
+	return nil
+}
+
+func (srv *Server) SendKanban(ctx context.Context, req *kanbanpb.Request) (*kanbanpb.Response, error) {
+	if err := srv.io.WriteKanban(
+		kanban.GetStreamKeyByStatusType(req.MicroserviceName, int(req.Message.ProcessNumber), kanban.StatusType_After),
+		req.Message,
+	); err != nil {
+		log.Errorf("[SendKanban] failed to write kanban")
+		return &kanbanpb.Response{
+			Status: kanbanpb.ResponseStatus_FAILED,
+			Error:  fmt.Sprintf("cannot write kanban: %v", err),
+		}, err
+	}
+
+	return &kanbanpb.Response{
+		Status: kanbanpb.ResponseStatus_SUCCESS,
+		Error:  "",
+	}, nil
+}
+
+func (srv *Server) SendStaticKanban(ctx context.Context, req *kanbanpb.StaticRequest) (*kanbanpb.Response, error) {
+	if err := srv.io.WriteKanban(
+		kanban.GetStaticStreamKey(req.Topic.Name),
+		req.Message,
+	); err != nil {
+		log.Errorf("[SendStaticKanban] failed to write kanban")
+		return &kanbanpb.Response{
+			Status: kanbanpb.ResponseStatus_FAILED,
+			Error:  fmt.Sprintf("cannot write kanban: %v", err),
+		}, err
+	}
+
+	return &kanbanpb.Response{
+		Status: kanbanpb.ResponseStatus_SUCCESS,
+		Error:  "",
+	}, nil
+}
+
+func (srv *Server) DeleteStaticKanban(ctx context.Context, req *kanbanpb.DeleteStaticRequest) (*kanbanpb.Response, error) {
+	if err := srv.io.DeleteKanban(
+		kanban.GetStaticStreamKey(req.Topic.Name),
+		req.Id,
+	); err != nil {
+		log.Errorf("[DeleteStaticKanban] failed to delete kanban")
+		return &kanbanpb.Response{
+			Status: kanbanpb.ResponseStatus_FAILED,
+			Error:  fmt.Sprintf("cannot delete kanban: %v", err),
+		}, err
+	}
+
+	return &kanbanpb.Response{
+		Status: kanbanpb.ResponseStatus_SUCCESS,
+		Error:  "",
+	}, nil
 }

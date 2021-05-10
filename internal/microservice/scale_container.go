@@ -2,9 +2,12 @@
 package microservice
 
 import (
-	"bitbucket.org/latonaio/aion-core/config"
 	"fmt"
 	"strconv"
+
+	"bitbucket.org/latonaio/aion-core/pkg/k8s"
+
+	"bitbucket.org/latonaio/aion-core/config"
 )
 
 type Container interface {
@@ -20,35 +23,28 @@ type ContainerStatus struct {
 type ScaleContainer struct {
 	name          string
 	containerList map[int]*ContainerStatus
+	multiple      bool
 }
 
-func NewScaleContainer(aionHome string, msName string, msData *config.Microservice) (*ScaleContainer, error) {
+func NewScaleContainer(k8sEnv *k8s.K8sEnv, aionHome string, msName string, msData *config.Microservice) (*ScaleContainer, error) {
 	containerList := make(map[int]*ContainerStatus)
-	var err error
 	for i := 1; i <= int(msData.Scale); i++ {
 		// Set ms number
 		msData.Env["MS_NUMBER"] = strconv.Itoa(i)
 		var ms Container
-		if msData.Docker {
-			msData.Env["IS_DOCKER"] = "true"
-			ms = NewContainerMicroservice(msName, msData, i)
-		} else {
-			ms, err = NewDirectoryMicroservice(aionHome, msName, msData, i)
-			if err != nil {
-				return nil, err
-			}
-		}
-		cs := &ContainerStatus{
+		ms = NewContainerMicroservice(k8sEnv, msName, msData, i)
+
+		containerList[i] = &ContainerStatus{
 			Container:    ms,
 			NumOfUpState: 0,
 		}
-		containerList[i] = cs
 	}
-	sc := &ScaleContainer{
+
+	return &ScaleContainer{
 		name:          msName,
 		containerList: containerList,
-	}
-	return sc, nil
+		multiple:      msData.Multiple,
+	}, nil
 }
 
 func (sc *ScaleContainer) GetScale() int {
@@ -65,7 +61,7 @@ func (sc *ScaleContainer) StartMicroservice(mNum int) error {
 	if _, ok := sc.containerList[mNum]; !ok {
 		return fmt.Errorf("microservice does not exists (name: %s, number:%d)", sc.name, mNum)
 	}
-	if sc.containerList[mNum].NumOfUpState > 0 {
+	if sc.containerList[mNum].NumOfUpState > 0 && !sc.multiple {
 		return fmt.Errorf(
 			"microservice already started, multiple service is not allowed (name: %s, scale: %d, request: %d)",
 			sc.name, len(sc.containerList), mNum)

@@ -6,6 +6,7 @@ import (
 	"path"
 
 	"bitbucket.org/latonaio/aion-core/config"
+	"bitbucket.org/latonaio/aion-core/proto/servicepb"
 )
 
 var (
@@ -18,13 +19,12 @@ var (
 	testEnv             = map[string]string{"test": "env"}
 	microserviceData    = &config.Microservice{
 		Command:     []string{"python3 test.py"},
-		NextService: make(map[string][]*config.NextServiceSetting),
+		NextService: make(map[string]*servicepb.NextService),
 		Scale:       2,
 		Env:         testEnv,
 		Always:      false,
 		Position:    "Runtime",
 		Multiple:    false,
-		Docker:      false,
 		Startup:     false,
 		Interval:    0,
 	}

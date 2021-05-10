@@ -3,6 +3,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -20,18 +21,18 @@ type Job struct {
 	serviceName string
 	pod         *Pod
 	job         v1.JobInterface
-	k8s         *k8sResource
+	k8sEnv      *K8sEnv
 }
 
 func NewJob(
 	serviceName string, tag string, number int, command []string, ports []*config.PortConfig, env map[string]string, volumeMountPathList []string,
-	serviceAccount string, privileged bool, k8s *k8sResource, targetNode string) *Job {
+	serviceAccount string, privileged bool, k8sEnv *K8sEnv, targetNode string, resources *config.Resources) *Job {
 
 	return &Job{
-		name:        k8s.getLabelName(serviceName, number, targetNode),
+		name:        getLabelName(serviceName, number),
 		serviceName: serviceName,
-		job:         k8s.client.BatchV1().Jobs(k8s.namespace),
-		k8s:         k8s,
+		job:         GetClient().BatchV1().Jobs(k8sEnv.Namespace),
+		k8sEnv:      k8sEnv,
 		pod: NewPod(
 			serviceName,
 			tag,
@@ -42,45 +43,28 @@ func NewJob(
 			volumeMountPathList,
 			serviceAccount,
 			privileged,
-			k8s,
+			k8sEnv,
 			targetNode,
+			resources,
 		),
 	}
 }
 
 func (j *Job) Apply() error {
 	jobConfig := j.config()
+	ctx := context.Background()
 
-	if _, err := j.job.Get(j.k8s.ctx, j.name, metaV1.GetOptions{}); err != nil {
-		result, err := j.job.Create(j.k8s.ctx, jobConfig, metaV1.CreateOptions{})
+	if _, err := j.job.Get(ctx, j.name, metaV1.GetOptions{}); err != nil {
+		result, err := j.job.Create(ctx, jobConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply job is failed: %v", err)
 		}
 		log.Printf("[k8s] Created Job %s", result.GetObjectMeta().GetName())
-
 	} else {
 		if err := j.Delete(); err != nil {
 			return err
 		}
-		const connRetryCount = 10
-		if err := retry.Do(
-			func() error {
-				if _, err := j.job.Get(j.k8s.ctx, j.name, metaV1.GetOptions{}); err != nil {
-					log.Printf("[k8s] Duplicate job is deleted")
-					return nil
-				}
-				return fmt.Errorf("[k8s] Duplicate job is not deleted")
-			},
-			retry.DelayType(func(n uint, config *retry.Config) time.Duration {
-				log.Printf("[k8s] Retry to check duplicated job is deleted")
-				return time.Second
-			}),
-			retry.Attempts(connRetryCount),
-		); err != nil {
-			return err
-		}
-
-		result, err := j.job.Create(j.k8s.ctx, jobConfig, metaV1.CreateOptions{})
+		result, err := j.job.Create(ctx, jobConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] apply job is failed: %v", err)
 		}
@@ -92,12 +76,29 @@ func (j *Job) Apply() error {
 
 func (j *Job) Delete() error {
 	deletePolicy := metaV1.DeletePropagationForeground
-	if err := j.job.Delete(
-		j.k8s.ctx, j.name, metaV1.DeleteOptions{PropagationPolicy: &deletePolicy}); err != nil {
+	ctx := context.Background()
+	if err := j.job.Delete(ctx, j.name, metaV1.DeleteOptions{PropagationPolicy: &deletePolicy}); err != nil {
 		return fmt.Errorf("[k8s] Delete job is failed: %v", err)
 	}
 
-	log.Printf("[k8s] Deleted job %s", j.name)
+	const connRetryCount = 30
+	if err := retry.Do(
+		func() error {
+			if _, err := j.job.Get(ctx, j.name, metaV1.GetOptions{}); err != nil {
+				log.Printf("[k8s] Deleted job %s", j.name)
+				return nil
+			}
+			return fmt.Errorf("[k8s] Job is not deleted")
+		},
+		retry.DelayType(func(n uint, config *retry.Config) time.Duration {
+			log.Printf("[k8s] Retry to check job is deleted")
+			return 2 * time.Second
+		}),
+		retry.Attempts(connRetryCount),
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -110,7 +111,7 @@ func (j *Job) config() *batchV1.Job {
 			Kind:       "job",
 			APIVersion: "batch/v1",
 		},
-		ObjectMeta: j.k8s.getObjectMeta(j.serviceName, j.pod.number, j.pod.TargetNode),
+		ObjectMeta: getObjectMeta(j.k8sEnv.Namespace, j.serviceName, j.pod.number, j.pod.TargetNode),
 		Spec: batchV1.JobSpec{
 			Completions:             int32Ptr(1),
 			Parallelism:             int32Ptr(1),

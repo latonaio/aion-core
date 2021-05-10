@@ -3,10 +3,13 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
+	"github.com/avast/retry-go"
 	apiV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -20,26 +23,27 @@ type Service struct {
 	number      int
 	ports       []*config.PortConfig
 	network     string
-	k8s         *k8sResource
+	k8sEnv      *K8sEnv
 }
 
-func NewService(serviceName string, number int, ports []*config.PortConfig, network string, k8s *k8sResource) *Service {
+func NewService(serviceName string, number int, ports []*config.PortConfig, network string, k8sEnv *K8sEnv) *Service {
 	return &Service{
 		serviceName: serviceName,
-		name:        fmt.Sprintf("%s-srv", k8s.getLabelName(serviceName, number, "")),
-		service:     k8s.client.CoreV1().Services(k8s.namespace),
+		name:        fmt.Sprintf("%s-srv", getLabelName(serviceName, number)),
+		service:     GetClient().CoreV1().Services(k8sEnv.Namespace),
 		number:      number,
 		ports:       ports,
 		network:     network,
-		k8s:         k8s,
+		k8sEnv:      k8sEnv,
 	}
 }
 
 func (s *Service) Apply() error {
 	svConfig := s.config()
+	ctx := context.Background()
 
-	if _, err := s.service.Get(s.k8s.ctx, s.name, metaV1.GetOptions{}); err != nil {
-		result, err := s.service.Create(s.k8s.ctx, svConfig, metaV1.CreateOptions{})
+	if _, err := s.service.Get(ctx, s.name, metaV1.GetOptions{}); err != nil {
+		result, err := s.service.Create(ctx, svConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] Created service is failed: %v", err)
 		}
@@ -48,7 +52,7 @@ func (s *Service) Apply() error {
 		if err := s.Delete(); err != nil {
 			return err
 		}
-		result, err := s.service.Create(s.k8s.ctx, svConfig, metaV1.CreateOptions{})
+		result, err := s.service.Create(ctx, svConfig, metaV1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("[k8s] Created service is failed: %v", err)
 		}
@@ -60,12 +64,29 @@ func (s *Service) Apply() error {
 
 func (s *Service) Delete() error {
 	name := s.getLabelName(s.serviceName, s.number)
-	if err := s.k8s.client.CoreV1().Services(
-		s.k8s.namespace).Delete(s.k8s.ctx, name, metaV1.DeleteOptions{}); err != nil {
+	ctx := context.Background()
+	if err := s.service.Delete(ctx, name, metaV1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("[k8s] Delete Service is failed: %v", err)
 	}
 
-	log.Printf("[k8s] Deleted service %s", name)
+	const connRetryCount = 30
+	if err := retry.Do(
+		func() error {
+			if _, err := s.service.Get(ctx, s.name, metaV1.GetOptions{}); err != nil {
+				log.Printf("[k8s] Deleted service %s", name)
+				return nil
+			}
+			return fmt.Errorf("[k8s] Service is not deleted")
+		},
+		retry.DelayType(func(n uint, config *retry.Config) time.Duration {
+			log.Printf("[k8s] Retry to check service is deleted")
+			return 2 * time.Second
+		}),
+		retry.Attempts(connRetryCount),
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -76,13 +97,14 @@ func (s *Service) config() *apiV1.Service {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Labels: s.k8s.getLabelMap(s.serviceName, s.number),
-			Name:   s.name,
+			Labels:    getLabelMap(s.serviceName, s.number),
+			Name:      s.name,
+			Namespace: s.k8sEnv.Namespace,
 		},
 		Spec: apiV1.ServiceSpec{
 			Type:         s.getServiceType(),
 			Ports:        s.getPortConfigList(),
-			Selector:     s.k8s.getLabelMap(s.serviceName, s.number),
+			Selector:     getLabelMap(s.serviceName, s.number),
 			TopologyKeys: s.getTopologyKeys(),
 		},
 		Status: apiV1.ServiceStatus{},
@@ -90,7 +112,7 @@ func (s *Service) config() *apiV1.Service {
 }
 
 func (s *Service) getLabelName(serviceName string, number int) string {
-	return fmt.Sprintf("%s-srv", s.k8s.getLabelName(serviceName, number, ""))
+	return fmt.Sprintf("%s-srv", getLabelName(serviceName, number))
 }
 
 func (s *Service) getPortConfigList() []apiV1.ServicePort {

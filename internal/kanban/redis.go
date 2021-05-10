@@ -11,38 +11,23 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 )
 
-func NewRedisAdapter() Adapter {
+const initPrevID = "0"
+
+func NewRedisAdapter(redis *my_redis.RedisClient) Adapter {
 	return &RedisAdaptor{
-		prevID: "0",
+		redis: redis,
 	}
 }
 
 type RedisAdaptor struct {
-	prevID string
-}
-
-func getBeforeStreamKey(msName string, number int) string {
-	return strings.Join([]string{
-		"kanban", "before", msName, fmt.Sprintf("%03d", number)}, ":")
-}
-
-func getAfterStreamKey(msName string, number int) string {
-	return strings.Join([]string{
-		"kanban", "after", msName, fmt.Sprintf("%03d", number)}, ":")
-}
-
-func getStreamKeyByStatusType(msName string, msNumber int, statusType StatusType) string {
-	switch statusType {
-	case StatusType_Before:
-		return getBeforeStreamKey(msName, msNumber)
-	case StatusType_After:
-		return getAfterStreamKey(msName, msNumber)
-	default:
-		return ""
-	}
+	redis *my_redis.RedisClient
 }
 
 func unmarshalKanban(hash map[string]interface{}) (*kanbanpb.StatusKanban, error) {
+	if hash == nil {
+		log.Println("hash not found")
+		return nil,nil
+	}
 	str, ok := hash["kanban"].(string)
 	if !ok {
 		return nil, fmt.Errorf("kanban is not string")
@@ -57,8 +42,7 @@ func unmarshalKanban(hash map[string]interface{}) (*kanbanpb.StatusKanban, error
 	return k, nil
 }
 
-func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb.StatusKanban, statusType StatusType) error {
-	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
+func (a *RedisAdaptor) WriteKanban(streamKey string, kanban *kanbanpb.StatusKanban) error {
 
 	m := jsonpb.Marshaler{}
 	kanbanJson, err := m.MarshalToString(kanban)
@@ -66,39 +50,53 @@ func (a *RedisAdaptor) WriteKanban(msName string, msNumber int, kanban *kanbanpb
 		return fmt.Errorf("[write kanban] cant marshal kanban, %v", err)
 	}
 	val := map[string]interface{}{"kanban": kanbanJson}
-	if err := my_redis.GetInstance().XAdd(streamKey, val); err != nil {
+	if err := a.redis.XAdd(streamKey, val); err != nil {
 		return fmt.Errorf("[write kanban] cant write kanban to redis, %v", err)
 	}
 	log.Printf("[write kanban] write to queue (streamkey: %s)", streamKey)
 	return nil
 }
 
-func (a *RedisAdaptor) WatchKanban(ctx context.Context, msName string, msNumber int, statusType StatusType) (<-chan *kanbanpb.StatusKanban, error) {
-	streamKey := getStreamKeyByStatusType(msName, msNumber, statusType)
-	ch := make(chan *kanbanpb.StatusKanban)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				close(ch)
-				return
-			default:
-				hash, nextID, err := my_redis.GetInstance().XReadOne([]string{streamKey}, []string{a.prevID}, 1, 0)
-				if err != nil {
-					log.Printf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
-					close(ch)
-					return
-				}
-				a.prevID = nextID
-				k, err := unmarshalKanban(hash)
-				if err != nil {
-					log.Printf("[watch kanban] %v (streamKey: %s)", err, streamKey)
-					continue
-				}
-				log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
-				ch <- k
-			}
-		}
+func (a *RedisAdaptor) WatchKanban(ctx context.Context, kanbanCh chan<- *AdaptorKanban, streamKey string, deleteOldKanban bool) {
+	defer func() {
+		log.Printf("[watch kanban] stop watch kanban :%s", streamKey)
+		close(kanbanCh)
 	}()
-	return ch, nil
+
+	prevID := initPrevID
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[watch kanban] redis context closed")
+			return
+		default:
+			hash, nextID, err := a.redis.XReadOne([]string{streamKey}, []string{prevID}, 1, 0)
+			if err != nil {
+				log.Errorf("[watch kanban] blocking in watching kanban is exit (streamKey :%s) %v", streamKey, err)
+				return
+			}
+			if deleteOldKanban {
+				log.Debugf("[watch kanban] remove already read kanban: (%s:%s)", streamKey, prevID)
+				if err := a.redis.XDel(streamKey, []string{prevID}); err != nil {
+					log.Errorf("[watch kanban] cannot delete kanban: (%s:%s)", streamKey, prevID)
+				}
+			}
+			prevID = nextID
+			k, err := unmarshalKanban(hash)
+			if err != nil {
+				log.Errorf("[watch kanban] %v (streamKey: %s)", err, streamKey)
+				continue
+			}
+			log.Printf("[watch kanban] read by queue (streamKey: %s)", streamKey)
+			kanbanCh <- &AdaptorKanban{ID: prevID, Kanban: k}
+		}
+	}
+}
+
+func (a *RedisAdaptor) DeleteKanban(streamKey string, id string) error {
+	if err := a.redis.XDel(streamKey, []string{id}); err != nil {
+		log.Errorf("[delete kanban] cannot delete kanban: (%s:%s)", streamKey, id)
+		return err
+	}
+	return nil
 }

@@ -11,6 +11,9 @@ RUN go mod download
 
 COPY . .
 
+# RUN NOWTIME=$(date +%m/%d_%H:%M)
+# RUN COMMAND=$(echo "go build -o send-anything -ldflags "$(echo '"-X main.buildDate='$NOWTIME'"')" ./cmd/send-anything")
+# RUN $(echo $COMMAND)
 RUN go build -o send-anything ./cmd/send-anything
 
 

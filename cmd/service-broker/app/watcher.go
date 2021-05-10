@@ -3,15 +3,17 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
+
 	"bitbucket.org/latonaio/aion-core/config"
 	"bitbucket.org/latonaio/aion-core/internal/devices"
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
-	"context"
-	"fmt"
-	"strconv"
-	"sync"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -21,8 +23,9 @@ const (
 type Watcher struct {
 	sync.Mutex
 	kanban.Adapter
-	startCh          chan *Container
-	stopCh           chan *Container
+
+	startCh chan *Container
+	// send anything grpc server
 	deviceController *devices.Controller
 	aionSetting      *config.AionSetting
 }
@@ -31,35 +34,41 @@ func NewWatcher(dc *devices.Controller, io kanban.Adapter) *Watcher {
 	return &Watcher{
 		Adapter:          io,
 		startCh:          NewContainerCh(),
-		stopCh:           NewContainerCh(),
 		deviceController: dc,
 	}
 }
 
-func (w *Watcher) WatchReceiveKanban(aionCh <-chan *config.AionSetting) {
+func (w *Watcher) WatchReceiveKanban(ctx context.Context, aionCh <-chan *config.AionSetting) {
 	deviceCh := w.deviceController.GetReceiveKanbanCh()
 	for {
 		select {
+		case <-ctx.Done():
+			log.Printf("[watcher] stop watch receive kanban")
+			return
 		case as := <-aionCh:
 			w.Lock()
 			w.aionSetting = as
 			w.Unlock()
-		case k := <-deviceCh:
-			if err := w.sendToNextService(k.AfterKanban, k.NextService, int(k.NextNumber)); err != nil {
-				log.Print(err)
+		case k, ok := <-deviceCh:
+			if !ok {
+				return
 			}
+			if err := w.WriteKanban(kanban.GetStreamKeyByStatusType(k.NextService, int(k.NextNumber), kanban.StatusType_Before), k.AfterKanban); err != nil {
+				log.Errorf("[watcher: start microservice] %v", err)
+			}
+			w.startCh <- NewContainer(k.NextService, int(k.NextNumber))
 		}
 	}
 }
 
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int) {
 	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, kanban.StatusType_After)
-	if err != nil {
-		log.Printf("cannot start watch microservice (name:%s, num:%d)", msName, msNumber)
-		return
-	}
+	defer func() {
+		log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
+		cancel()
+	}()
+	kanbanCh := make(chan *kanban.AdaptorKanban)
+	go w.WatchKanban(childCtx, kanbanCh, kanban.GetStreamKeyByStatusType(msName, msNumber, kanban.StatusType_After), false)
 
 	log.Printf("[watcher] start watch microservice : %s-%03d\n", msName, msNumber)
 	for {
@@ -67,15 +76,36 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 		case <-ctx.Done():
 			log.Printf("[watcher] stop watch microservice : %s-%03d\n", msName, msNumber)
 			return
-		case k := <-kanbanCh:
+		case ak, ok := <-kanbanCh:
+			if !ok {
+				log.Warnf("[watcher] watch kanban closed")
+				return
+			}
+			k := ak.Kanban
+			if k.ConnectionKey == serviceBrokerName {
+				serviceName, _, err := w.terminateServiceParser(k)
+				if err != nil {
+					log.Errorf("[watcher: terminate microservice] %v", err)
+					continue
+				}
+				msList := w.aionSetting.GetMicroserviceList()
+				msData, ok := msList[serviceName]
+				if !ok {
+					log.Errorf("[watcher: terminate microservice] not found such as service: %s", serviceName)
+					continue
+				}
+				if !msData.Always {
+					return
+				}
+			}
 			nextServiceList, err := w.aionSetting.GetNextServiceList(msName, k.ConnectionKey)
 			if err != nil {
-				log.Printf("[watcher] %v, skipped", err)
+				log.Warnf("[watcher] %v, skipped", err)
 				continue
 			}
 			for _, nextService := range nextServiceList {
 				number := config.GetNextNumber(k.ProcessNumber, nextService.NumberPattern)
-				nextDeviceName := k.Services[len(k.Services)-1].Device
+				nextDeviceName := k.NextDeviceName
 				if nextDeviceName == "" {
 					nextDeviceName = nextService.NextDevice
 				}
@@ -84,61 +114,47 @@ func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber
 					w.deviceController.SendFileToDevice(nextDeviceName, k, nextService.NextServiceName, number, device.Addr)
 				} else {
 					// send to local microservice
-					k.Services[len(k.Services)-1].Device = w.aionSetting.GetDeviceName()
-					if err := w.sendToNextService(k, nextService.NextServiceName, number); err != nil {
-						log.Print(err)
+					k.NextDeviceName = w.aionSetting.GetDeviceName()
+					if err := w.WriteKanban(kanban.GetStreamKeyByStatusType(nextService.NextServiceName, number, kanban.StatusType_Before), k); err != nil {
+						log.Errorf("[watcher: start microservice] %v", err)
 					}
+					w.startCh <- NewContainer(nextService.NextServiceName, number)
 				}
 			}
 		}
 	}
 }
 
-func (w *Watcher) sendToNextService(k *kanbanpb.StatusKanban, serviceName string, number int) error {
-	if serviceName == serviceBrokerName {
-		serviceName, number, err := w.terminateServiceParser(k)
-		if err != nil {
-			return fmt.Errorf("[watcher: terminate microservice] %v", err)
-		}
-		w.stopCh <- NewContainer(serviceName, number)
-	} else {
-		if err := w.WriteKanban(serviceName, number, k, kanban.StatusType_Before); err != nil {
-			return fmt.Errorf("[watcher: start microservice] %v", err)
-		}
-		w.startCh <- NewContainer(serviceName, number)
-	}
-	return nil
-}
-
 func (w *Watcher) terminateServiceParser(k *kanbanpb.StatusKanban) (string, int, error) {
-	if funcName, ok := k.Metadata.Fields["type"]; !ok || funcName.String() != "terminate" {
+	m := k.GetMetadata()
+	var ret map[string]interface{}
+	b, err := protojson.Marshal(m)
+	if err != nil {
+		return "", 0, fmt.Errorf("Failed to marshal grpc stream")
+	}
+	if err := json.Unmarshal(b, &ret); err != nil {
+		return "", 0, fmt.Errorf("Failed to unmarshal json")
+	}
+
+	if funcName, ok := ret["type"].(string); !ok || funcName != "terminate" {
+		log.Printf("ok %v funcName.String() %s", ok, funcName)
 		return "", 0, fmt.Errorf("invalid function name (expect: terminate)")
 	}
 
-	serviceNameValue, ok := k.Metadata.Fields["name"]
+	serviceNameValue, ok := ret["name"].(string)
 	if !ok {
 		return "", 0, fmt.Errorf("not set service name")
 	}
-	serviceName := serviceNameValue.String()
 
-	numberValue, ok := k.Metadata.Fields["number"]
+	number, ok := ret["number"].(int)
 	if !ok {
-		return serviceName, -1, nil
-	} else {
-		number, err := strconv.Atoi(numberValue.String())
-		if err != nil {
-			return "", 0, fmt.Errorf("invalid number value :%s", numberValue)
-		}
-		return serviceName, number, nil
+		return serviceNameValue, -1, nil
 	}
+	return serviceNameValue, number, nil
 }
 
 func (w *Watcher) GetStartCh() chan *Container {
 	return w.startCh
-}
-
-func (w *Watcher) GetStopCh() chan *Container {
-	return w.stopCh
 }
 
 func NewContainerCh() chan *Container {

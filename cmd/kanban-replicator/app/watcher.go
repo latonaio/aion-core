@@ -12,6 +12,7 @@ import (
 	"bitbucket.org/latonaio/aion-core/internal/kanban"
 	"bitbucket.org/latonaio/aion-core/pkg/log"
 	"bitbucket.org/latonaio/aion-core/pkg/my_mongo"
+	"bitbucket.org/latonaio/aion-core/pkg/my_redis"
 	"bitbucket.org/latonaio/aion-core/proto/kanbanpb"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -20,8 +21,8 @@ type Watcher struct {
 	kanban.Adapter
 }
 
-func NewRequestRedisWatcher() *Watcher {
-	return newWatcher(kanban.NewRedisAdapter())
+func NewRequestRedisWatcher(redis *my_redis.RedisClient) *Watcher {
+	return newWatcher(kanban.NewRedisAdapter(redis))
 }
 
 func newWatcher(io kanban.Adapter) *Watcher {
@@ -33,34 +34,35 @@ func newWatcher(io kanban.Adapter) *Watcher {
 func (w *Watcher) WatchMicroservice(ctx context.Context, msName string, msNumber int, statusType kanban.StatusType) {
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	kanbanCh, err := w.WatchKanban(childCtx, msName, msNumber, statusType)
-	if err != nil {
-		log.Printf("[ERR] %v", err)
-		return
-	}
+	kanbanCh := make(chan *kanban.AdaptorKanban)
+	go w.WatchKanban(childCtx, kanbanCh, kanban.GetStreamKeyByStatusType(msName, msNumber, statusType), false)
+
 	streamKey := getStreamKey(msName, msNumber, statusType)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case k := <-kanbanCh:
-			w.WriteKanbanMongo(ctx, k, streamKey)
+		case k, ok := <-kanbanCh:
+			if !ok {
+				return
+			}
+			w.WriteKanbanMongo(ctx, k.Kanban, streamKey)
 		}
 	}
 }
 
 func (w *Watcher) WriteKanbanMongo(ctx context.Context, kanban *kanbanpb.StatusKanban, streamKey string) error {
 	val := map[string]interface{}{
-		"streamKey":     streamKey,
-		"startAt":       kanban.StartAt,
-		"finishAt":      kanban.FinishAt,
-		"services":      kanban.Services,
-		"connectionKey": kanban.ConnectionKey,
-		"processNumber": kanban.ProcessNumber,
-		"priorSuccess":  kanban.PriorSuccess,
-		"dataPath":      kanban.DataPath,
-		"fileList":      kanban.FileList,
-		"metadata":      unpackStruct(kanban.Metadata),
+		"streamKey":      streamKey,
+		"startAt":        kanban.StartAt,
+		"finishAt":       kanban.FinishAt,
+		"nextDeviceName": kanban.NextDeviceName,
+		"connectionKey":  kanban.ConnectionKey,
+		"processNumber":  kanban.ProcessNumber,
+		"priorSuccess":   kanban.PriorSuccess,
+		"dataPath":       kanban.DataPath,
+		"fileList":       kanban.FileList,
+		"metadata":       unpackStruct(kanban.Metadata),
 	}
 
 	if err := my_mongo.GetInstance().InsertOne(ctx, val); err != nil {

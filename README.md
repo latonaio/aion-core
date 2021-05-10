@@ -1,108 +1,66 @@
 # aion-core
 
-aion-coreはAIONのプラットフォームにあるマイクロサービスを動作させるのに必要なオープンソースシステムです。
+aion-coreはマイクロサービスプラットフォームであるAIONを動作させるのに必要なオープンソースシステムです。
 
-AIONのメインコンポーネント、マイクロサービスで利用するライブラリ、kubernetesのデプロイメントに必要なConfigなどを提供しております。
+aion-coreはAIONプラットフォーム上でマイクロサービスを動作させるために、以下のリソースを提供しています。
 
-aion-coreは単体nodeでのdeployと、worker nodとしてのdeployの2通りのdeployが可能です。
+* AIONのメインコンポーネント
+* マイクロサービスで利用するライブラリ
+* kubernetesへのデプロイに必要な設定ファイル
+
+また、aion-coreは単体のマシンで動作するシングルモードと、複数のマシン間でクラスタ構成をとるクラスタモードの２通りでの動作が可能です。
 
 **目次**
 
-* [aion-core](#aion-core)
-    * [マイクロサービス構成の例](#マイクロサービス構成の例)
-    * [cluster構成](#cluster構成)
-    * [動作環境](#動作環境)
-        * [前提条件](#前提条件)
-    * [OS側の事前準備](#os側の事前準備)
-        * [hostnameの設定](#hostnameの設定)
-    * [Databaseについて](#databaseについて)
-        * [Redis](#redis)
-        * [Mongo DB](#mongo-db)
-        * [mysql](#mysql)
-    * [セットアップ(master/worker共通)](#セットアップmasterworker共通)
-        * [ディレクトリ](#ディレクトリ)
-        * [1.kubernetes](#1kubernetes)
-            * [a.Dockerをインストール&amp;有効化](#adockerをインストール有効化)
-            * [b.kubeadm、kubelet、kubectlをインストール](#bkubeadmkubeletkubectlをインストール)
-        * [2.AION](#2aion)
-            * [a.DOCKER_BUILDKITの環境変数を設定](#adocker_buildkitの環境変数を設定)
-            * [b.daemon.jsonの内容を変更](#bdaemonjsonの内容を変更)
-            * [c.os再起動](#cos再起動)
-            * [d.aion-coreのbuild](#daion-coreのbuild)
-        * [3. pyhon-base-imagesのセットアップ](#3-pyhon-base-imagesのセットアップ)
-        * [4.project.ymlの設定](#4projectymlの設定)
-            * [配置](#配置)
-            * [項目定義](#項目定義)
-        * [5.envoyのdocker imageを準備](#5envoyのdocker-imageを準備)
-        * [6.aion-core-manifestsの配置](#6aion-core-manifestsの配置)
-    * [master nodeのdeploy](#master-nodeのdeploy)
-        * [1.Kubeadmでセットアップ](#1kubeadmでセットアップ)
-        * [2.Flannelのコンテナをデプロイする](#2flannelのコンテナをデプロイする)
-        * [3.Master Nodeの隔離を無効にする](#3master-nodeの隔離を無効にする)
-        * [4.Master Nodeがクラスターに参加していることを確認する](#4master-nodeがクラスターに参加していることを確認する)
-    * [worker nodeのdeploy(複数node構成にしない場合は飛ばして可)](#worker-nodeのdeploy複数node構成にしない場合は飛ばして可)
-        * [1.ノードをワーカーノードとしてclusterに参加させる](#1ノードをワーカーノードとしてclusterに参加させる)
-        * [2.secret情報をconfigに書き込む](#2secret情報をconfigに書き込む)
-        * [3.各manifestファイルを修正](#3各manifestファイルを修正)
-            * [project.ymlの各microserviceに対して、targetNodeパラメータを追加](#projectymlの各microserviceに対してtargetnodeパラメータを追加)
-            * [Aion-coreのmanifestに対してnodeSelectorを追加](#aion-coreのmanifestに対してnodeselectorを追加)
-            * [mysql-kubeのdeployment.ymlに対してnodeSelectorを追加](#mysql-kubeのdeploymentymlに対してnodeselectorを追加)
-            * [aion-core外部で実行している各サービスのmanifestに対してnodeSelectorを追加](#aion-core外部で実行している各サービスのmanifestに対してnodeselectorを追加)
-        * [4.参加したクラスターにaion-coreをdeploy](#4参加したクラスターにaion-coreをdeploy)
-    * [AIONの起動と停止(master/worker)](#aionの起動と停止masterworker)
-        * [defaultネームスペース](#defaultネームスペース)
-            * [起動](#起動)
-            * [停止](#停止)
-                * [aion-coreのみを停止](#aion-coreのみを停止)
-                * [aion全体を停止](#aion全体を停止)
-        * [prjネームスペース](#prjネームスペース)
-            * [起動](#起動-1)
-                * [aion-coreのみを停止](#aion-coreのみを停止-1)
-                * [aionを停止](#aionを停止)
-        * [AIONの起動](#aionの起動)
-
-## マイクロサービス構成の例
-
-![マイクロサービス構成の例](https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png)
-
-## cluster構成
-
-単体nodeでclusterを運用する場合、aion-coreと各microserviceはmaster nodeに対してdeployされることになります。
-
-一方で、aion-coreをdeployした複数のエッジ端末でclusterを構成するようなケースの場合、master nodeとしてkubernetesを構築したエッジ端末に対して、その他のエッジ端末をworker
-nodeとして紐づけて、単一のclusterで管理することが可能です。
-
-master nodeとworker nodeの構築手順は一部異なりますが、OS,端末サイドのセットアップ手順や必要なリソースは基本的に共通です。
+* [動作環境](#動作環境)
+    * [前提条件](#前提条件)
+* [AIONで利用しているミドルウェア群](#AIONで利用しているミドルウェア群)
+    * [Redis](#redis)
+    * [Mongo DB](#mongo-db)
+    * [mysql](#mysql)
+* [マイクロサービス構成の例](#マイクロサービス構成の例)
+* [シングルモードとクラスタモード](#シングルモードとクラスタモード)
+    * [シングルモード](#シングルモード)
+    * [クラスタモード](#クラスタモード)
+* [セットアップ](#セットアップ)
+    * [hostnameの設定](#hostnameの設定)
+    * [ディレクトリの作成](#ディレクトリの作成)
+    * [kubernetesのインストール](#1.kubernetesのインストール)
+    * [AIONのセットアップ](#AIONのセットアップ)
+    * [aion-core-manifestsの配置](#aion-core-manifestsの配置)
+    * [project.ymlの設定](#project.ymlの設定)
+* [Master nodeの構築(シングルモード/クラスタモードのMaster)](#Master-nodeの構築)
+    * [1.Kubeadmでセットアップ](#1kubeadmでセットアップ)
+    * [2.Flannelのコンテナをデプロイする](#2flannelのコンテナをデプロイする)
+    * [3.Master Nodeの隔離を無効にする](#3master-nodeの隔離を無効にする)
+    * [4.Master Nodeがクラスターに参加していることを確認する](#4master-nodeがクラスターに参加していることを確認する)
+    * [5.(クラスタモードのみ)aionctlのインストール](#aionctlのインストール)
+* [Worker nodeの構築(クラスタモードのWorke)](#Worker-nodeの構築)
+    * [1.ノードをワーカーノードとしてclusterに参加させる](#1ノードをワーカーノードとしてclusterに参加させる)
+    * [2.secret情報をconfigに書き込む](#2secret情報をconfigに書き込む)
+    * [3.参加したクラスターにaion-coreをdeploy](#3参加したクラスターにaion-coreをdeploy)
+* [シングルモードでのAIONの起動と停止](#シングルモードでのAIONの起動と停止)
+    * [defaultネームスペース](#defaultネームスペース)
+    * [prjネームスペース](#prjネームスペース)
+    * [AIONの起動](#aionの起動)
+* [クラスタモードでのAIONの起動と停止](#クラスタモードでのAIONの起動と停止)
+    * [aion-core-manifestのビルド](#aion-core-manifestのビルド)
+    * [各manifestファイルを修正](#各manifestファイルを修正)
+    * [起動](#起動)
+    * [停止](#停止)
+* [動作確認](#動作確認)
 
 ## 動作環境
 
 ### 前提条件
 
 動作には以下の環境であることを前提とします。
+また、aion-coreの動作にはKubernetesのインストールが必要です。
 
 * OS: Linux
 * CPU: Intel64/AMD64/ARM64
 
-## OS側の事前準備
-
-* ネットワークIPアドレスの固定
-* hostnameの設定
-
-### hostnameの設定
-
-AIONではLinuxの端末名を頼りに端末間通信を行うので、端末名を一台ごとに異なるものに変えておく必要があります。端末名を変更する場合は以下のコマンドを実行してください。
-
-```
-hostnamectl set-hostname [new device name]
-```
-
-その後一度ターミナルを閉じ、開き直し、 以下のコマンドを実行して端末名が変更されていることを確認します。
-
-```
-hostnamectl
-```
-
-## Databaseについて
+## AIONで利用しているミドルウェア群
 
 AIONでは以下のデータベースを採用しております。 aion-coreと同時にkubernetes上に展開されます。
 
@@ -126,11 +84,43 @@ Replicatorを通して保存する役割を担っています。
 
 AIONではmysqlデータベースを使用する場合は別途デプロイが必要です。 mysqlを立ち上げる場合は[こちら](https://github.com/latonaio/mysql-kube) を参照してください。
 
-## セットアップ(master/worker共通)
+## マイクロサービス構成の例
 
-### ディレクトリ
+![マイクロサービス構成の例](https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png)
 
-はじめに作業ファイル等を配置するディレクトリを作成します。
+## シングルモードとクラスタモード
+
+### シングルモード
+
+シングルモードでは、aion-coreはKubernetesのMaster node上に各種リソースおよびマイクロサービスがデプロイされます。
+
+### クラスタモード
+
+クラスタモードでは、aion-coreはKubernetesのMaster node上にmaster-aionがデプロイされ、
+Worker node上にworker-aionおよび各マイクロサービスがデプロイされます。
+
+クラスタモードの特徴として、デプロイするマイクロサービスをWorker node単位で指定することができます。
+デプロイ先の指示はmaster-aionから各worker-aionに対して振り分けられ、master-aion上でデプロイの状況などを見ることもできます。
+
+## セットアップ(シングルモード/クラスタモード共通)
+
+### hostnameの設定
+
+AIONではLinuxの端末名を頼りに端末間通信を行うため、端末名を一台ごとに異なるものに変えておく必要があります。端末名を変更する場合は以下のコマンドを実行してください。
+
+```
+hostnamectl set-hostname [new device name]
+```
+
+その後一度ターミナルを閉じ、開き直し、 以下のコマンドを実行して端末名が変更されていることを確認します。
+
+```
+hostnamectl
+```
+
+### ディレクトリの作成
+
+作業ファイル等を配置するディレクトリを作成します。
 
 ```
 mkdir ~/$(hostname)
@@ -148,9 +138,9 @@ sudo mkdir -p /var/lib/aion/Data/deployment
 sudo mkdir -p /var/lib/aion/prj/Data
 ```
 
-### 1.kubernetes
+### kubernetesのインストール
 
-#### a.Dockerをインストール&有効化
+#### 1. Dockerをインストール&有効化
 
 ```
 sudo apt install docker.io
@@ -165,7 +155,7 @@ sudo gpasswd -a $USER docker
 sudo systemctl restart docker
 ```
 
-#### b.kubeadm、kubelet、kubectlをインストール
+#### 2. kubeadm、kubelet、kubectlをインストール
 
 Kubernentsクラスターを構築するツールであるKubeadmを用いてセットアップを行います。
 
@@ -179,15 +169,13 @@ sudo apt update && sudo apt install -y kubelet kubeadm kubectl
 sudo apt show kubelet kubeadm kubectl
 ```
 
-### 2.AION
-
-#### a.DOCKER_BUILDKITの環境変数を設定
+#### 3. DOCKER_BUILDKITの環境変数を設定
 
 ```
 echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
 ```
 
-#### b.daemon.jsonの内容を変更
+#### 4. daemon.jsonの内容を変更
 
 ```shell
 sudo vi /etc/docker/daemon.json
@@ -210,14 +198,16 @@ sudo vi /etc/docker/daemon.json
 }
 ```
 
-#### c.os再起動
+#### 5. os再起動
 
 ```shell
 source ~/.bashrc
 reboot 
 ```
 
-#### d.aion-coreのbuild
+### AIONのセットアップ
+
+#### 1. aion-coreのbuild
 
 ```shell
 cd $(hostname)/AionCore
@@ -228,7 +218,7 @@ make docker-build
 cd ..
 ```
 
-### 3. pyhon-base-imagesのセットアップ
+#### 2. pyhon-base-imagesのbuild
 
 一部のマイクロサービスのDockerイメージには、以下のベースイメージが必要となります。
 
@@ -237,11 +227,38 @@ cd ..
 
 pyhon-base-imagesのREADMEを参照し、これらのベースイメージを準備してください。
 
-### 4.project.ymlの設定
+#### 3. envoyのdocker imageの用意
+
+```
+docker login
+docker pull envoyproxy/envoy:v1.16-latest
+docker tag latonaio/envoy:latest localhost:31112/envoy:latest
+```
+#### 4. 各種マイクロサービスのbuild
+
+AION上で動作させるためのマイクロサービスのDocker Imageを作成します。
+
+クラスタモードで動作させる場合、デプロイ先のWorker Node上でそれぞれ個別にDocker Imageを作成する必要があります。
+
+
+### aion-core-manifestsの配置
+
+aion-coreをデプロイするためのマニフェストファイル群です。
+クラスタモードで利用する場合は、master nodeのあるマシン上に配備してください。
+
+```
+cd ~/$(hostname)/AionCore
+git clone https://github.com/latonaio/aion-core-manifests.git
+cd aion-core-manifests
+```
+### project.ymlの設定
+
+aion-coreでは、マイクロサービスをデプロイするために、YAML形式の定義ファイルを作成する必要があります。
+
 
 #### 配置
 
-project.ymlを配置します。
+シングルモードで利用する場合は、以下のディレクトリに project.ymlを配置します。
 
 ```
 project.ymlは/var/lib/aion/(namespace)/configの中に配置する。
@@ -285,23 +302,8 @@ microservices.[service-name].targetNode：nodeをworker nodeとして運用す�
     targetNode: YOUR_NODE_NAME
 ```
 
-### 5.envoyのdocker imageを準備
 
-```
-docker login
-docker pull envoyproxy/envoy:v1.16-latest
-docker tag latonaio/envoy:latest localhost:31112/envoy:latest
-```
-
-### 6.aion-core-manifestsの配置
-
-```
-cd ~/$(hostname)/AionCore
-git clone https://github.com/latonaio/aion-core-manifests.git
-cd aion-core-manifests
-```
-
-## 単体nodeのdeploy
+## Master nodeの構築(シングルモード/クラスタモードのMaster)
 
 ### 1.Kubeadmでセットアップ
 
@@ -340,7 +342,15 @@ kubectl taint nodes --all node-role.kubernetes.io/master-
 kubectl get node
 ```
 
-## worker nodeのdeploy(複数node構成にしない場合は飛ばして可)
+### 5.(クラスタモードのみ)aionctlのインストール
+
+```
+cd /path/to/aion-core/
+go install cmd/aionctl/main.go
+
+```
+
+## worker nodeの構築(クラスタモードのWorker)
 
 ### 1.ノードをワーカーノードとしてclusterに参加させる
 
@@ -357,65 +367,7 @@ kubeadm join {マスターノードのIP}:6443 --token {token} --discovery-token
 
 master nodeの`/etc/kubernetes/admin.conf`内の設定ファイルを、worker nodeの`~/.kube/config`にコピー
 
-### 3.各manifestファイルを修正
-
-#### project.ymlの各microserviceに対して、targetNodeパラメータを追加
-
-```yaml
-startup: no
-ports: hoge
-...
-targetNode: ＄{NODE_NAME}
-```
-
-#### Aion-coreのmanifestに対してnodeSelectorを追加
-
-```shell
-cd ~/$(hostname)/AionCore/aion-core-manifest
-vi generated/deafult.yaml
-```
-
-```yaml
-template:
-  metadata:
-    labels:
-      app: hoge
-  spec:
-    containers:
-    ...
-    spec.template.spec.nodeSelect:
-      kubernetes.io/hostname: ${NODE_NAME}
-```
-
-#### mysql-kubeのdeployment.ymlに対してnodeSelectorを追加
-
-```yaml
-template:
-  metadata:
-    labels:
-      app: hoge
-  spec:
-    containers:
-    ...
-    spec.template.spec.nodeSelect:
-      kubernetes.io/hostname: ${NODE_NAME}
-```  
-
-#### aion-core外部で実行している各サービスのmanifestに対してnodeSelectorを追加
-
-```yaml
-template:
-  metadata:
-    labels:
-      app: hoge
-  spec:
-    containers:
-    ...
-    spec.template.spec.nodeSelect:
-      kubernetes.io/hostname: ${NODE_NAME}
-```
-
-### 4.Master Nodeと共にnodeがクラスターに参加していることを確認する
+### 3.Master Nodeと共にnodeがクラスターに参加していることを確認する
 
 下記のコマンドを実行し、master nodeと自分のnodeが表示され、StatusがREADYになっていれば完了です。
 
@@ -423,62 +375,109 @@ template:
 kubectl get node
 ```
 
-## AIONの起動と停止(master/worker)
+## シングルモードでのAIONの起動と停止
+
+各種起動/停止用のスクリプトは、aion-core-manifestの中にあります。
 
 ### defaultネームスペース
 
 #### 起動
 
 ```shell
-# NODE_NAMEはdeployするnodeの名前を指定（他のnodeの指定も可）
-make apply-node NODE-NAME=${NODE_NAME}
+$ sh kubectl-apply.sh
 ```
 
 #### 停止
 
-##### aion-coreのみを停止
-
-defaultネームスペースで起動しているaion-coreのみ停止する（サーバは停止しない）
-
 ```shell
-$ bash kubectl-delete only-aion.sh
-```
-
-##### aion全体を停止
-
-```shell
-# NODE_NAMEはdeployするnodeの名前を指定（他のnodeの指定も可）
-make delete-node NODE-NAME=${NODE_NAME}
+$ sh kubectl-delete.sh
 ```
 
 ### prjネームスペース
 
 #### 起動
 
-prjネームスペースでaionを起動する
-
 ```
 $ kubectl apply -f generated/prj.yml
 ```
 
-##### aion-coreのみを停止
-
-prjネームスペースで起動しているaion-coreのみ停止する（サーバは停止しない）
-
-```
-$ bash kubectl-delete only-aion-prj.sh
-```
-
-##### aionを停止
-
-prjネームスペースで起動しているaionを停止する（prjネームスペースごと）
+##### 停止
 
 ```
 $ kubectl delete -f generated/prj.yml
 ```
 
-### AIONの起動
+## クラスタモードでのAIONの起動と停止
 
+###  aion-core-manifestのビルド
+
+```
+$ make build-master HOST={masterのHOSTNAME}
+$ make build-worker HOST={workerのHOSTNAME}
+```
+
+### 各manifestファイルを修正
+
+#### project.ymlの各microserviceに対して、targetNodeパラメータを追加
+
+```yaml
+startup: no
+ports: hoge
+...
+targetNode: {workerのHOSTNAME}
+```
+
+### mysql-kubeのdeployment.ymlに対してnamespaceとnodeSelectorを追加
+
+```yaml
+metadata:
+  namespace: {workerのHOSTNAME}
+
+template:
+  metadata:
+    labels:
+      app: hoge
+  spec:
+    containers:
+    ...
+    spec.template.spec.nodeSelect:
+      kubernetes.io/hostname: {workerのHOSTNAME}
+```  
+
+### aion-core外部で実行している各サービスのmanifestに対してnamespace, nodeSelectorを追加
+
+volume mountで、ディレクトリパスなどの変更が必要な場合は、合わせて修正する
+
+```yaml
+metadata:
+  namespace: {workerのHOSTNAME}
+
+template:
+  metadata:
+    labels:
+      app: hoge
+  spec:
+    containers:
+    ...
+    spec.template.spec.nodeSelect:
+      kubernetes.io/hostname: {workerのHOSTNAME}
+```
+
+### 起動
+
+```
+$ make apply-master
+$ make apply-worker HOST={workerのHOSTNAME}
+```
+
+### 停止
+
+```
+$ make delete-worker HOST={workersのHOSTNAME}
+$ make delete-master
+```
+
+## 動作確認
 ```
 aion-coreが正常に動作しているか確認するには、以下のコマンドを実行する
 $ kubectl get pod
@@ -495,4 +494,5 @@ redis-cluster : Redisサーバ
 
 その後、任意のマイクロサービスが起動しているかを確認する
 ```
+
 

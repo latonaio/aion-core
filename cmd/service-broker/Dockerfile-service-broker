@@ -29,4 +29,4 @@ WORKDIR ${AION_HOME}
 
 COPY --from=service-broker-builder /go/src/bitbucket.org/latonaio/service-broker .
 
-CMD ["./service-broker", "-d", "-c", "config/project.yml"]
+CMD ["./service-broker", "-c", "config/project.yml"]
