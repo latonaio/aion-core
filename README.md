@@ -66,6 +66,7 @@ AIONでは以下のデータベースを採用しております。 aion-coreと
 
 - Redis
 - Mongo DB
+- MySQL
 
 ### Redis
 
@@ -75,6 +76,8 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 
 * 各マイクロサービスで利用できるデータキャッシュサーバ
 
+* フロントエンドで発生した動的データを保持
+
 ### Mongo DB
 
 MongoDBはNoSQLの一種でドキュメント指向データベースと言われるDBです。スキーマレスでデータを保存し、永続化をサポートしています。 AIONでは、各マイクロサービスのLogをKanban
@@ -82,11 +85,36 @@ Replicatorを通して保存する役割を担っています。
 
 ### mysql
 
-AIONではmysqlデータベースを使用する場合は別途デプロイが必要です。 mysqlを立ち上げる場合は[こちら](https://github.com/latonaio/mysql-kube) を参照してください。
+AIONでは、主にフロントエンドで発生した静的データが保持されます。mysqlを立ち上げる場合は[こちら](https://github.com/latonaio/mysql-kube) を参照してください。
 
-## マイクロサービス構成の例
+### WebRTC
 
-![マイクロサービス構成の例](https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png)
+AIONでは、ブラウザで利用可能な API として、ビデオ、音声、および一般的なデータをリアルタイムにやり取りすることができます。
+
+### gRPC
+
+AIONでは、あるマイクロサービスからのリクエストに対して応答し、別のマイクロサービスへ送信することで、双方のマイクロサービスが通信をできるようにします。
+
+### RabbitMQ
+
+AIONでは、メッセージングアーキテクチャの一構成例として、RabbitMQを用いてキューを用いた非同期処理を行います。詳しくは[こちら](https://github.com/latonaio/rabbitmq-for-kubernetes)を参照してください。
+
+## AION を用いたシステム構成の例
+
+### AION の基本的な構成
+
+AION がマイクロサービスの起動と通信を管理します。
+Send Anything からリクエストを送り、他のデバイスと接続することで拡張を行なうことができます。
+![マイクロサービス構成の例0](https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png)
+
+### AION のメッセージングアーキテクチャの一例（RabbitMQ）
+
+AION がマイクロサービスの起動を行い、マイクロサービス間の通信を RabbitMQ で管理します。
+RabbitMQ での通信により長時間安定したシステムが実現されます。
+さらに柔軟性の高さからシステムの拡張を容易に行うことができます。
+(例えば、gRPCのような、より重厚なメッセージングアーキテクチャを採用する場合、もしくは、gRPCとRabbitMQを組み合わせる場合の方が適切なときもあります)
+![マイクロサービス構成の例1](documents/aion-core-example1.drawio.png)
+
 
 ## シングルモードとクラスタモード
 
@@ -494,5 +522,4 @@ redis-cluster : Redisサーバ
 
 その後、任意のマイクロサービスが起動しているかを確認する
 ```
-
 
