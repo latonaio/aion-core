@@ -17,13 +17,15 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
 * [AIONの概要](#AIONの概要)
 * [AIONのアーキテクチャ](#AIONのアーキテクチャ)
 * [AIONの主要構成](#AIONの主要構成)
-* [AIONで利用しているミドルウェア群](#AIONで利用しているミドルウェア群)
+* [AIONにおけるミドルウェアとフレームワーク](#AIONで利用しているミドルウェアとフレームワーク)
+    * [Envoy](#Envoy)
     * [Redis](#redis)
-    * [Mongo DB](#mongo-db)
-    * [mysql](#mysql)
+    * [MongoDB](#mongodb)
+    * [MySQL](#MySQL)
     * [WebRTC](#WebRTC)
     * [gRPC](#gRPC)
     * [RabbitMQ](#RabbitMQ)
+    * [ReactJS](#ReactJS)
 * [AIONを用いたシステム構成の例](#AIONを用いたシステム構成の例)
     * [AION のメッセージングアーキテクチャの一例（RabbitMQ）](#AIONのメッセージングアーキテクチャの一例（RabbitMQ）)
     * [AION のアーキテクチャの一例（WebRTC）](#AIONのアーキテクチャの一例（WebRTC）)
@@ -84,16 +86,23 @@ Status Kanban および Kanban Replicatorは、それぞれAION™のコア機�
 - Send Anything：
 Send Anythingは、エッジのAION™プラットフォームでソフトウェアのコアスタック専用に機能する統合カンバンネイティブデータ処理システムを提供します。 Send Anything によるクロスデバイスかんばん処理システムは、AION™サービスブローカーによってオーケストレーションされ、多数のネットワークノード全体で、マイクロサービス指向アーキテクチャのデータ処理/インターフェースとアプリケーションのランタイムの柔軟なパターンを可能にします。   
 
-## AIONで利用しているミドルウェア群
+## AIONにおけるミドルウェアとフレームワーク
 
-AIONでは以下のデータベースを採用しております。 aion-coreと同時にkubernetes上に展開されます。
+AIONでは以下のミドルウェアとフレームワークを採用しております。 
 
+- Envoy
 - Redis
-- Mongo DB
+- MongoDB
 - MySQL
 - WebRTC
 - gRPC
 - RabbitMQ
+- ReactJS
+
+### Envoy
+
+Envoy はマイクロサービス間のネットワーク制御をライブラリとしてではなく、ネットワークプロキシとして提供します。
+AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。
 
 ### Redis
 
@@ -105,12 +114,12 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 
 * フロントエンドで発生した動的データを保持
 
-### Mongo DB
+### MongoDB
 
 MongoDBはNoSQLの一種でドキュメント指向データベースと言われるDBです。スキーマレスでデータを保存し、永続化をサポートしています。 AIONでは、各マイクロサービスのLogをKanban
 Replicatorを通して保存する役割を担っています。
 
-### mysql
+### MySQL
 
 AIONでは、主にフロントエンドで発生した静的データが保持されます。mysqlを立ち上げる場合は[こちら](https://github.com/latonaio/mysql-kube) を参照してください。
 
@@ -125,6 +134,12 @@ AIONでは、あるマイクロサービスからのリクエストに対して�
 ### RabbitMQ
 
 AIONでは、メッセージングアーキテクチャの一構成例として、RabbitMQを用いてキューを用いた非同期処理を行います。詳しくは[こちら](https://github.com/latonaio/rabbitmq-for-kubernetes)を参照してください。
+
+### ReactJS
+
+ReactJSは、ユーザインタフェース構築のためのJavaScriptライブラリです。   
+AIONからのアウトプットをフロントエンドUIに表示したり、フロントエンドUIからの指示をバックエンド経由でAIONに伝えたりする役割を果たします。
+ReactJSはコンポーネントベースで、大規模なJavaScriptコードを部品化させることで保守性を高めたり、既存のReactコンポーネントを再利用したりできるため、マイクロサービスアーキテクチャに適しています。
 
 ## AIONを用いたシステム構成の例
 
