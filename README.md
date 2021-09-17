@@ -14,21 +14,32 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
 
 * [動作環境](#動作環境)
     * [前提条件](#前提条件)
-* [AIONで利用しているミドルウェア群](#AIONで利用しているミドルウェア群)
+* [AIONの概要](#AIONの概要)
+* [AIONのアーキテクチャ](#AIONのアーキテクチャ)
+* [AIONの主要構成](#AIONの主要構成)
+* [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
+    * [Envoy](#Envoy)
     * [Redis](#redis)
-    * [Mongo DB](#mongo-db)
-    * [mysql](#mysql)
-* [マイクロサービス構成の例](#マイクロサービス構成の例)
+    * [MongoDB](#mongodb)
+    * [MySQL](#MySQL)
+    * [WebRTC](#WebRTC)
+    * [gRPC](#gRPC)
+    * [RabbitMQ](#RabbitMQ)
+    * [ReactJS](#ReactJS)
+* [AIONを用いたシステム構成の例](#AIONを用いたシステム構成の例)
+    * [AION のメッセージングアーキテクチャの一例（RabbitMQ）](#AIONのメッセージングアーキテクチャの一例（RabbitMQ）)
+    * [AION のアーキテクチャの一例（WebRTC）](#AIONのアーキテクチャの一例（WebRTC）)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
-* [セットアップ](#セットアップ)
+* [セットアップ(シングルモード/クラスタモード共通)](#セットアップ(シングルモード/クラスタモード共通))
     * [hostnameの設定](#hostnameの設定)
     * [ディレクトリの作成](#ディレクトリの作成)
     * [kubernetesのインストール](#1.kubernetesのインストール)
     * [AIONのセットアップ](#AIONのセットアップ)
     * [aion-core-manifestsの配置](#aion-core-manifestsの配置)
     * [project.ymlの設定](#project.ymlの設定)
+    * [aion-core-manifestsのビルド・修正(シングルモード/クラスタモードで異なります)](#aion-core-manifestsのビルド・修正(シングルモード/クラスタモードで異なります))
 * [Master nodeの構築(シングルモード/クラスタモードのMaster)](#Master-nodeの構築)
     * [1.Kubeadmでセットアップ](#1kubeadmでセットアップ)
     * [2.Flannelのコンテナをデプロイする](#2flannelのコンテナをデプロイする)
@@ -39,16 +50,13 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
     * [1.ノードをワーカーノードとしてclusterに参加させる](#1ノードをワーカーノードとしてclusterに参加させる)
     * [2.secret情報をconfigに書き込む](#2secret情報をconfigに書き込む)
     * [3.参加したクラスターにaion-coreをdeploy](#3参加したクラスターにaion-coreをdeploy)
-* [シングルモードでのAIONの起動と停止](#シングルモードでのAIONの起動と停止)
-    * [defaultネームスペース](#defaultネームスペース)
-    * [prjネームスペース](#prjネームスペース)
-    * [AIONの起動](#aionの起動)
-* [クラスタモードでのAIONの起動と停止](#クラスタモードでのAIONの起動と停止)
+* [AIONの起動と停止（シングルモード/クラスタモードで異なります）](#AIONの起動と停止（シングルモード/クラスタモードで異なります）)
+    * [AIONの起動と停止(シングルモード)](#AIONの起動と停止(シングルモード))
+　　* [AIONの起動と停止（クラスタモード）](#AIONの起動と停止（クラスタモード）)
     * [aion-core-manifestのビルド](#aion-core-manifestのビルド)
-    * [各manifestファイルを修正](#各manifestファイルを修正)
+* [aion-core の起動と停止](#aion-core の起動と停止)
     * [起動](#起動)
     * [停止](#停止)
-* [動作確認](#動作確認)
 
 ## 動作環境
 
@@ -60,13 +68,41 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
 * OS: Linux
 * CPU: Intel64/AMD64/ARM64
 
-## AIONで利用しているミドルウェア群
+## AIONの概要
+AIONは、100% Linux のオープンソース環境をベースとして構築された、主にエッジコンピューティングのための、マイクロサービス志向のコンピューティング・プラットフォーム環境です。   
+ほぼ全てのマイクロサービス、ミドルウェアがエッジ端末上でコンテナ化されており、エッジ端末上に構築された コンテナオーケストレーションシステムのKubernetesによって制御・監視されています。
 
-AIONでは以下のデータベースを採用しております。 aion-coreと同時にkubernetes上に展開されます。
+## AIONのアーキテクチャ
 
+![マイクロサービス構成の例0](documents/aion-core-architecture.png)
+
+## AIONの主要構成
+- Service Broker：
+Service Brokerは、AION™のマイクロサービスのコア機能で、全てのマイクロサービスの実行に関する統括制御をつかさどるモジュールです。   
+- Status Kanban および Kanban Replicator：
+Status Kanban および Kanban Replicatorは、それぞれAION™のコア機能の1つで、マイクロサービス間のかんばんのやりとりを制御します。AION™　にはカンバンロジックがあらかじめ含まれているため、コンピューティングリソースとストレージリソースが制限されたエッジで、1、10、または100ミリ秒のタイムサイクルでエンドポイントの高性能処理を実行できます。マイクロサービス（マイクロサービスA>マイクロサービスB>マイクロサービスCなど）の各連続処理に割り当てられたAまたは一部のカンバンカードは、エッジでのIoTおよびAI処理における大量の同時注文の一貫性とモデレーションを厳密に維持します。    
+- Send Anything：
+Send Anythingは、エッジのAION™プラットフォームでソフトウェアのコアスタック専用に機能する統合カンバンネイティブデータ処理システムを提供します。 Send Anything によるクロスデバイスかんばん処理システムは、AION™サービスブローカーによってオーケストレーションされ、多数のネットワークノード全体で、マイクロサービス指向アーキテクチャのデータ処理/インターフェースとアプリケーションのランタイムの柔軟なパターンを可能にします。   
+- その他：
+Data Sweeperは、マイクロサービスが生成した不要なファイルを定期的に削除する機能を提供します。これにより、ストレージリソースをクリーンアップして、エッジアプリケーションの実行時環境を安定かつ適度に保つことが可能になります。また、Data Sweeperはセキュリティブローカーとしても機能し、デバイス上の個人情報を自動的に消去することで、非常に安全なエッジ環境を確保し、個人のデータが外部に漏洩しないようにします。data-sweeper-kubeを立ち上げる場合は[こちら](https://github.com/latonaio/data-sweeper-kube)を参照してください。   
+
+## AIONにおけるミドルウェアとフレームワーク
+
+AIONでは以下のミドルウェアとフレームワークを採用しております。 
+
+- Envoy
 - Redis
-- Mongo DB
+- MongoDB
 - MySQL
+- WebRTC
+- gRPC
+- RabbitMQ
+- ReactJS
+
+### Envoy
+
+Envoy はマイクロサービス間のネットワーク制御をライブラリとしてではなく、ネットワークプロキシとして提供します。
+AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。
 
 ### Redis
 
@@ -78,12 +114,12 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 
 * フロントエンドで発生した動的データを保持
 
-### Mongo DB
+### MongoDB
 
 MongoDBはNoSQLの一種でドキュメント指向データベースと言われるDBです。スキーマレスでデータを保存し、永続化をサポートしています。 AIONでは、各マイクロサービスのLogをKanban
 Replicatorを通して保存する役割を担っています。
 
-### mysql
+### MySQL
 
 AIONでは、主にフロントエンドで発生した静的データが保持されます。mysqlを立ち上げる場合は[こちら](https://github.com/latonaio/mysql-kube) を参照してください。
 
@@ -99,15 +135,15 @@ AIONでは、あるマイクロサービスからのリクエストに対して�
 
 AIONでは、メッセージングアーキテクチャの一構成例として、RabbitMQを用いてキューを用いた非同期処理を行います。詳しくは[こちら](https://github.com/latonaio/rabbitmq-for-kubernetes)を参照してください。
 
-## AION を用いたシステム構成の例
+### ReactJS
 
-### AION の基本的な構成
+ReactJSは、ユーザインタフェース構築のためのJavaScriptライブラリです。   
+AIONからのアウトプットをフロントエンドUIに表示したり、フロントエンドUIからの指示をバックエンド経由でAIONに伝えたりする役割を果たします。
+ReactJSはコンポーネントベースで、大規模なJavaScriptコードを部品化させることで保守性を高めたり、既存のReactコンポーネントを再利用したりできるため、マイクロサービスアーキテクチャに適しています。
 
-AION がマイクロサービスの起動と通信を管理します。
-Send Anything からリクエストを送り、他のデバイスと接続することで拡張を行なうことができます。
-![マイクロサービス構成の例0](https://raw.githubusercontent.com/latonaio/aion-core/main/documents/aion-core-architecture.png)
+## AIONを用いたシステム構成の例
 
-### AION のメッセージングアーキテクチャの一例（RabbitMQ）
+### AIONのメッセージングアーキテクチャの一例（RabbitMQ）
 
 AION がマイクロサービスの起動を行い、マイクロサービス間の通信を RabbitMQ で管理します。
 RabbitMQ での通信により長時間安定したシステムが実現されます。
@@ -115,12 +151,18 @@ RabbitMQ での通信により長時間安定したシステムが実現され�
 (例えば、gRPCのような、より重厚なメッセージングアーキテクチャを採用する場合、もしくは、gRPCとRabbitMQを組み合わせる場合の方が適切なときもあります)
 ![マイクロサービス構成の例1](documents/aion-core-example1.drawio.png)
 
+### AIONのアーキテクチャの一例（WebRTC）
+
+AION のフロントエンドにWebRTCを実装して、フロントエンド／ブラウザからバックエンドサービス等へ、ビデオ・音声など、任意のデータ入力を、リアルタイムに送信することができます。   
+![マイクロサービス構成の例2](documents/aion-core-example2.png)
 
 ## シングルモードとクラスタモード
 
 ### シングルモード
 
-シングルモードでは、aion-coreはKubernetesのMaster node上に各種リソースおよびマイクロサービスがデプロイされます。
+シングルモードでは、aion-coreはKubernetesのMaster node上に各種リソースおよびマイクロサービスがデプロイされます。   
+
+シングルモードの特徴として、1つの端末上にマイクロサービスを展開し、aion-coreはそれらのサービスの起動または再起動、通信等を自動的に実行します。これにより、複数のマイクロサービスで構成されるシステムが実現できます。
 
 ### クラスタモード
 
@@ -330,8 +372,101 @@ microservices.[service-name].targetNode：nodeをworker nodeとして運用す�
     targetNode: YOUR_NODE_NAME
 ```
 
+##  aion-core-manifest のビルド・修正（シングルモード/クラスタモードで異なります）
 
-## Master nodeの構築(シングルモード/クラスタモードのMaster)
+###  aion-core-manifestのビルド（シングルモード）
+
+```
+make build
+```
+
+###  aion-core-manifestのビルド（クラスタモード）
+
+```
+$ make build-master HOST={masterのHOSTNAME}
+$ make build-worker HOST={workerのHOSTNAME}
+```
+
+### 各manifestファイルを修正（クラスタモード）
+
+#### project.ymlの各microserviceに対して、targetNodeパラメータを追加
+
+```yaml
+startup: no
+ports: hoge
+...
+targetNode: {workerのHOSTNAME}
+```
+
+#### mysql-kubeのdeployment.ymlに対してnamespaceとnodeSelectorを追加
+
+```yaml
+metadata:
+  namespace: {workerのHOSTNAME}
+
+template:
+  metadata:
+    labels:
+      app: hoge
+  spec:
+    containers:
+    ...
+    spec.template.spec.nodeSelect:
+      kubernetes.io/hostname: {workerのHOSTNAME}
+```  
+
+#### aion-core外部で実行している各サービスのmanifestに対してnamespace, nodeSelectorを追加
+
+volume mountで、ディレクトリパスなどの変更が必要な場合は、合わせて修正する
+
+```yaml
+metadata:
+  namespace: {workerのHOSTNAME}
+
+template:
+  metadata:
+    labels:
+      app: hoge
+  spec:
+    containers:
+    ...
+    spec.template.spec.nodeSelect:
+      kubernetes.io/hostname: {workerのHOSTNAME}
+```
+
+#### 起動
+
+```
+$ make apply-master
+$ make apply-worker HOST={workerのHOSTNAME}
+```
+
+#### 停止
+
+```
+$ make delete-worker HOST={workersのHOSTNAME}
+$ make delete-master
+```
+
+#### 動作確認
+```
+aion-coreが正常に動作しているか確認するには、以下のコマンドを実行する
+$ kubectl get pod
+または
+$ kubectl get pod -n prj
+
+以下の名前を含むpodが起動すればaion-coreは動作している
+aion-servicebroker : マイクロサービスの呼び出しを管理する
+aion-statuskanban : マイクロサービス間のデータ(看板)受け渡しを管理する
+aion-sendanything : 端末間のデータ(看板)受け渡しを管理する
+aion-kanban-replicator : 処理が終わった看板をログとしてmongodbに保管する
+mongo : MongoDBサーバ
+redis-cluster : Redisサーバ
+
+その後、任意のマイクロサービスが起動しているかを確認する
+```
+
+## Master nodeの構築（シングルモード/クラスタモードのMaster）
 
 ### 1.Kubeadmでセットアップ
 
@@ -378,7 +513,7 @@ go install cmd/aionctl/main.go
 
 ```
 
-## worker nodeの構築(クラスタモードのWorker)
+## worker nodeの構築（クラスタモードのWorker）
 
 ### 1.ノードをワーカーノードとしてclusterに参加させる
 
@@ -403,123 +538,55 @@ master nodeの`/etc/kubernetes/admin.conf`内の設定ファイルを、worker n
 kubectl get node
 ```
 
-## シングルモードでのAIONの起動と停止
+## AIONの起動と停止（シングルモード/クラスタモードで異なります）
 
-各種起動/停止用のスクリプトは、aion-core-manifestの中にあります。
+AION 本体およびAION 稼働に必要なリソースをまとめて起動、停止します。
 
-### defaultネームスペース
+e.g. service broker, envoy, status-kanban, redis など
+
+各 Shellスクリプトは、aion-core-manifests の中にあります。
+
+
+## AIONの起動と停止（シングルモード）
+
 
 #### 起動
 
 ```shell
-$ sh kubectl-apply.sh
+$ sh aion-start.sh
 ```
 
 #### 停止
 
 ```shell
-$ sh kubectl-delete.sh
+$ sh aion-stop.sh
 ```
 
-### prjネームスペース
+
+## AIONの起動と停止（クラスタモード）
+
 
 #### 起動
 
-```
-$ kubectl apply -f generated/prj.yml
-```
-
-##### 停止
-
-```
-$ kubectl delete -f generated/prj.yml
+```shell
+$ sh aion-start.sh
 ```
 
-## クラスタモードでのAIONの起動と停止
+#### 停止
 
-###  aion-core-manifestのビルド
-
-```
-$ make build-master HOST={masterのHOSTNAME}
-$ make build-worker HOST={workerのHOSTNAME}
+```shell
+$ sh aion-stop.sh
 ```
 
-### 各manifestファイルを修正
+## aion-core の起動と停止（シングルモード/クラスタモード共通）
 
-#### project.ymlの各microserviceに対して、targetNodeパラメータを追加
+aion-core を単体で起動、停止します。
 
-```yaml
-startup: no
-ports: hoge
-...
-targetNode: {workerのHOSTNAME}
+#### 起動
 ```
-
-### mysql-kubeのdeployment.ymlに対してnamespaceとnodeSelectorを追加
-
-```yaml
-metadata:
-  namespace: {workerのHOSTNAME}
-
-template:
-  metadata:
-    labels:
-      app: hoge
-  spec:
-    containers:
-    ...
-    spec.template.spec.nodeSelect:
-      kubernetes.io/hostname: {workerのHOSTNAME}
-```  
-
-### aion-core外部で実行している各サービスのmanifestに対してnamespace, nodeSelectorを追加
-
-volume mountで、ディレクトリパスなどの変更が必要な場合は、合わせて修正する
-
-```yaml
-metadata:
-  namespace: {workerのHOSTNAME}
-
-template:
-  metadata:
-    labels:
-      app: hoge
-  spec:
-    containers:
-    ...
-    spec.template.spec.nodeSelect:
-      kubernetes.io/hostname: {workerのHOSTNAME}
+$ sh aion-core-start.sh
 ```
-
-### 起動
-
+#### 停止
 ```
-$ make apply-master
-$ make apply-worker HOST={workerのHOSTNAME}
+$ sh aion-stop.sh
 ```
-
-### 停止
-
-```
-$ make delete-worker HOST={workersのHOSTNAME}
-$ make delete-master
-```
-
-## 動作確認
-```
-aion-coreが正常に動作しているか確認するには、以下のコマンドを実行する
-$ kubectl get pod
-または
-$ kubectl get pod -n prj
-
-以下の名前を含むpodが起動すればaion-coreは動作している
-aion-servicebroker : マイクロサービスの呼び出しを管理する
-aion-statuskanban : マイクロサービス間のデータ(看板)受け渡しを管理する
-aion-sendanything : 端末間のデータ(看板)受け渡しを管理する
-aion-kanban-replicator : 処理が終わった看板をログとしてmongodbに保管する
-mongo : MongoDBサーバ
-redis-cluster : Redisサーバ
-
-その後、任意のマイクロサービスが起動しているかを確認する
-```
-

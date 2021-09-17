@@ -77,6 +77,8 @@ func (srv *Server) ReceiveKanban(req *kanbanpb.InitializeService, stream kanbanp
 	// receive kanban from redis and send client microservice
 	log.Printf("[ReceiveKanban] startconnection: %s", req.MicroserviceName)
 	for res := range recvCh {
+		log.Printf("res.Kanban value: %v", res.Kanban)
+
 		if err := stream.Send(res.Kanban); err != nil {
 			log.Errorf("[ReceiveKanban] failed to send: %v", err)
 			return err
