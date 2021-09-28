@@ -24,12 +24,12 @@ RUN apk add --no-cache libc6-compat
 
 ENV SERVICE=send-anything-server \
     POSITION=BackendService \
-    AION_HOME="/var/lib/aion" \
-    APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+    AION_HOME="/var/lib/aion"
 
-RUN mkdir -p ${AION_HOME}/Data && \
-    mkdir -p ${APP_DIR}
-WORKDIR ${APP_DIR}
+ENV APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+
+RUN mkdir -p ${AION_HOME}
+WORKDIR /usr/local/bin
 
 COPY --from=send-anything-builder /go/src/bitbucket.org/latonaio/send-anything .
 

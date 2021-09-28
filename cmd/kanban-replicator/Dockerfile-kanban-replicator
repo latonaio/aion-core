@@ -21,12 +21,13 @@ RUN apk add --no-cache libc6-compat
 
 ENV SERVICE=kanban-replicator \
     POSITION=BackendService \
-    AION_HOME="/var/lib/aion" \
-    APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+    AION_HOME="/var/lib/aion"
+
+ENV APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
 
 RUN mkdir -p ${AION_HOME}/Data
 WORKDIR ${AION_HOME}
 
 COPY --from=kanban-replicator-builder /go/src/bitbucket.org/latonaio/kanban-replicator .
 
-CMD ["./kanban-replicator", "-c", "config/project.yml"]
+CMD ["./kanban-replicator", "-c", "config/services.yml"]

@@ -21,8 +21,9 @@ RUN apk add --no-cache libc6-compat
 
 ENV SERVICE=status-kanban-server \
     POSITION=BackendService \
-    AION_HOME="/var/lib/aion" \
-    APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+    AION_HOME="/var/lib/aion"
+
+ENV APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
 
 RUN mkdir -p ${AION_HOME}/Data && \
     mkdir -p ${APP_DIR}

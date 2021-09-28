@@ -8,7 +8,7 @@ $ cd ~/path/to/aion-watchdog-kube
 $ bash docker-build.sh
 ```
 
-project.yamlに次の設定を追加してください。
+services.ymlに次の設定を追加してください。
 ```yaml
 aion-watchdog-kube:
     startup: yes

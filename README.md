@@ -17,6 +17,10 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
 * [AIONの概要](#AIONの概要)
 * [AIONのアーキテクチャ](#AIONのアーキテクチャ)
 * [AIONの主要構成](#AIONの主要構成)
+    * [Service Broker](#Service-Broker)
+    * [Status Kanban および Kanban Replicator](#Status-Kanban-および-Kanban-Replicator)
+    * [Send Anything](#Send-Anything)
+    * [その他](#その他)
 * [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
     * [Envoy](#Envoy)
     * [Redis](#redis)
@@ -38,23 +42,22 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
     * [kubernetesのインストール](#1.kubernetesのインストール)
     * [AIONのセットアップ](#AIONのセットアップ)
     * [aion-core-manifestsの配置](#aion-core-manifestsの配置)
-    * [project.ymlの設定](#project.ymlの設定)
+    * [services.ymlの設定](#services.ymlの設定)
     * [aion-core-manifestsのビルド・修正(シングルモード/クラスタモードで異なります)](#aion-core-manifestsのビルド・修正(シングルモード/クラスタモードで異なります))
-* [Master nodeの構築(シングルモード/クラスタモードのMaster)](#Master-nodeの構築)
+* [Master Nodeの構築(シングルモード/クラスタモードのMaster)](#Master-nodeの構築)
     * [1.Kubeadmでセットアップ](#1kubeadmでセットアップ)
     * [2.Flannelのコンテナをデプロイする](#2flannelのコンテナをデプロイする)
     * [3.Master Nodeの隔離を無効にする](#3master-nodeの隔離を無効にする)
     * [4.Master Nodeがクラスターに参加していることを確認する](#4master-nodeがクラスターに参加していることを確認する)
     * [5.(クラスタモードのみ)aionctlのインストール](#aionctlのインストール)
-* [Worker nodeの構築(クラスタモードのWorke)](#Worker-nodeの構築)
+* [Worker Nodeの構築(クラスタモードのWorker)](#Worker-nodeの構築)
     * [1.ノードをワーカーノードとしてclusterに参加させる](#1ノードをワーカーノードとしてclusterに参加させる)
     * [2.secret情報をconfigに書き込む](#2secret情報をconfigに書き込む)
     * [3.参加したクラスターにaion-coreをdeploy](#3参加したクラスターにaion-coreをdeploy)
-* [AIONの起動と停止（シングルモード/クラスタモードで異なります）](#AIONの起動と停止（シングルモード/クラスタモードで異なります）)
-    * [AIONの起動と停止(シングルモード)](#AIONの起動と停止(シングルモード))
-　　* [AIONの起動と停止（クラスタモード）](#AIONの起動と停止（クラスタモード）)
-    * [aion-core-manifestのビルド](#aion-core-manifestのビルド)
-* [aion-core の起動と停止](#aion-core の起動と停止)
+* [AIONの起動と停止（シングルモード/クラスタモード共通）](#AIONの起動と停止（シングルモード/クラスタモード共通）)
+    * [起動](#起動)
+    * [停止](#停止)
+* [aion-core の起動と停止（シングルモード/クラスタモード共通）](#aion-core-の起動と停止（シングルモード/クラスタモード共通）)
     * [起動](#起動)
     * [停止](#停止)
 
@@ -77,15 +80,30 @@ AIONは、100% Linux のオープンソース環境をベースとして構築�
 ![マイクロサービス構成の例0](documents/aion-core-architecture.png)
 
 ## AIONの主要構成
-- Service Broker：
-Service Brokerは、AION™のマイクロサービスのコア機能で、全てのマイクロサービスの実行に関する統括制御をつかさどるモジュールです。   
-- Status Kanban および Kanban Replicator：
-Status Kanban および Kanban Replicatorは、それぞれAION™のコア機能の1つで、マイクロサービス間のかんばんのやりとりを制御します。AION™　にはカンバンロジックがあらかじめ含まれているため、コンピューティングリソースとストレージリソースが制限されたエッジで、1、10、または100ミリ秒のタイムサイクルでエンドポイントの高性能処理を実行できます。マイクロサービス（マイクロサービスA>マイクロサービスB>マイクロサービスCなど）の各連続処理に割り当てられたAまたは一部のカンバンカードは、エッジでのIoTおよびAI処理における大量の同時注文の一貫性とモデレーションを厳密に維持します。    
-- Send Anything：
-Send Anythingは、エッジのAION™プラットフォームでソフトウェアのコアスタック専用に機能する統合カンバンネイティブデータ処理システムを提供します。 Send Anything によるクロスデバイスかんばん処理システムは、AION™サービスブローカーによってオーケストレーションされ、多数のネットワークノード全体で、マイクロサービス指向アーキテクチャのデータ処理/インターフェースとアプリケーションのランタイムの柔軟なパターンを可能にします。   
-- その他：
-Data Sweeperは、マイクロサービスが生成した不要なファイルを定期的に削除する機能を提供します。これにより、ストレージリソースをクリーンアップして、エッジアプリケーションの実行時環境を安定かつ適度に保つことが可能になります。また、Data Sweeperはセキュリティブローカーとしても機能し、デバイス上の個人情報を自動的に消去することで、非常に安全なエッジ環境を確保し、個人のデータが外部に漏洩しないようにします。data-sweeper-kubeを立ち上げる場合は[こちら](https://github.com/latonaio/data-sweeper-kube)を参照してください。   
 
+AIONでは、主要構成として以下があります。 
+
+- Service Broker
+- Status Kanban および Kanban Replicator
+- Send Anything
+- その他
+
+### Service Broker
+ 
+Service Brokerは、AION™のコア機能で、主にエッジコンテナオーケストレーション環境でのマイクロサービスの実行に関する統括制御をつかさどるモジュールです。
+ 
+### Status Kanban および Kanban Replicator
+ 
+Status Kanban および Kanban Replicatorは、それぞれAION™のコア機能の1つで、マイクロサービス間のかんばんのやりとりを制御します。AION™　にはカンバンロジックがあらかじめ含まれているため、コンピューティングリソースとストレージリソースが制限されたエッジで、1、10、または100ミリ秒のタイムサイクルでエンドポイントの高性能処理を実行できます。マイクロサービス（マイクロサービスA>マイクロサービスB>マイクロサービスCなど）の各連続処理に割り当てられたAまたは一部のカンバンカードは、エッジでのIoTおよびAI処理における大量の同時注文の一貫性とモデレーションを厳密に維持します。    
+ 
+### Send Anything
+ 
+Send Anythingは、エッジのAION™プラットフォームでソフトウェアのコアスタック専用に機能する統合カンバンネイティブデータ処理システムを提供します。 Send Anything によるクロスデバイスかんばん処理システムは、AION™サービスブローカーによってオーケストレーションされ、多数のネットワークノード全体で、マイクロサービス指向アーキテクチャのデータ処理/インターフェースとアプリケーションのランタイムの柔軟なパターンを可能にします。
+ 
+### その他
+ 
+Data Sweeperは、マイクロサービスが生成した不要なファイルを定期的に削除する機能を提供します。これにより、ストレージリソースをクリーンアップして、エッジアプリケーションの実行時環境を安定かつ適度に保つことが可能になります。また、Data Sweeperはセキュリティブローカーとしても機能し、デバイス上の個人情報を自動的に消去することで、非常に安全なエッジ環境を確保し、個人のデータが外部に漏洩しないようにします。data-sweeper-kubeを立ち上げる場合は[こちら](https://github.com/latonaio/data-sweeper-kube)を参照してください。   
+ 
 ## AIONにおけるミドルウェアとフレームワーク
 
 AIONでは以下のミドルウェアとフレームワークを採用しております。 
@@ -321,17 +339,17 @@ cd ~/$(hostname)/AionCore
 git clone https://github.com/latonaio/aion-core-manifests.git
 cd aion-core-manifests
 ```
-### project.ymlの設定
+### services.ymlの設定
 
 aion-coreでは、マイクロサービスをデプロイするために、YAML形式の定義ファイルを作成する必要があります。
 
 
 #### 配置
 
-シングルモードで利用する場合は、以下のディレクトリに project.ymlを配置します。
+シングルモードで利用する場合は、以下のディレクトリに services.ymlを配置します。
 
 ```
-project.ymlは/var/lib/aion/(namespace)/configの中に配置する。
+services.ymlは/var/lib/aion/(namespace)/configの中に配置する。
 ```
 
 #### 項目定義
@@ -466,7 +484,7 @@ redis-cluster : Redisサーバ
 その後、任意のマイクロサービスが起動しているかを確認する
 ```
 
-## Master nodeの構築（シングルモード/クラスタモードのMaster）
+## Master Nodeの構築（シングルモード/クラスタモードのMaster）
 
 ### 1.Kubeadmでセットアップ
 
@@ -513,7 +531,7 @@ go install cmd/aionctl/main.go
 
 ```
 
-## worker nodeの構築（クラスタモードのWorker）
+## Worker Nodeの構築（クラスタモードのWorker）
 
 ### 1.ノードをワーカーノードとしてclusterに参加させる
 
@@ -524,7 +542,7 @@ kubeadm token create --print-join-command
 kubeadm join {マスターノードのIP}:6443 --token {token} --discovery-token-ca-cert-hash sha256:{hash値} 
 ```
 
-※ worker node側でkubeadm initですでにclusterを立ち上げている場合は`sudo kubeadm reset`でclusterをリセットする
+※ Worker Node側でkubeadm initですでにclusterを立ち上げている場合は`sudo kubeadm reset`でclusterをリセットする
 
 ### 2.secret情報をconfigに書き込む
 
@@ -538,32 +556,14 @@ master nodeの`/etc/kubernetes/admin.conf`内の設定ファイルを、worker n
 kubectl get node
 ```
 
-## AIONの起動と停止（シングルモード/クラスタモードで異なります）
+## AIONの起動と停止（シングルモード/クラスタモード共通）
 
-AION 本体およびAION 稼働に必要なリソースをまとめて起動、停止します。
+aion-core およびAION 稼働に必要なリソースをまとめて起動、停止します。
 
-e.g. service broker, envoy, status-kanban, redis など
+aion-core には、Service Broker, Kanban Server, Kanban Replicator, Send Anything が含まれます。
+AION 稼働に必要なリソースには、Envoy, Redis, MongoDB などが含まれます。
 
-各 Shellスクリプトは、aion-core-manifests の中にあります。
-
-
-## AIONの起動と停止（シングルモード）
-
-
-#### 起動
-
-```shell
-$ sh aion-start.sh
-```
-
-#### 停止
-
-```shell
-$ sh aion-stop.sh
-```
-
-
-## AIONの起動と停止（クラスタモード）
+以下の各Shellスクリプトは、aion-core-manifests の中にあります。
 
 
 #### 起動
@@ -582,11 +582,12 @@ $ sh aion-stop.sh
 
 aion-core を単体で起動、停止します。
 
+
 #### 起動
 ```
 $ sh aion-core-start.sh
 ```
 #### 停止
 ```
-$ sh aion-stop.sh
+$ sh aion-core-stop.sh
 ```

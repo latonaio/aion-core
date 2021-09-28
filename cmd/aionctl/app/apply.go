@@ -14,7 +14,7 @@ import (
 func applyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "apply project file",
+		Short: "apply services file",
 		Args:  cobra.RangeArgs(1, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			hostName := fmt.Sprintf("%s:%s", HostName, PortNumber)
@@ -28,7 +28,7 @@ func applyCmd() *cobra.Command {
 			}
 			log.Debugf("aionctl apply : %+v \n", aion)
 			if err := services.Apply(hostName, aion); err != nil {
-				fmt.Printf("failed to send project.yaml to service-broker cause: %v \n", err)
+				fmt.Printf("failed to send services.yml to service-broker cause: %v \n", err)
 			}
 			return nil
 		},

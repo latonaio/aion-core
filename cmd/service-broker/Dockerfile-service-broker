@@ -21,12 +21,13 @@ RUN apk add --no-cache libc6-compat
 
 ENV SERVICE=service-broker \
     POSITION=BackendService \
-    AION_HOME="/var/lib/aion" \
-    APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
+    AION_HOME="/var/lib/aion"
+
+ENV APP_DIR="${AION_HOME}/${POSITION}/${SERVICE}"
 
 RUN mkdir -p ${AION_HOME}/Data
 WORKDIR ${AION_HOME}
 
 COPY --from=service-broker-builder /go/src/bitbucket.org/latonaio/service-broker .
 
-CMD ["./service-broker", "-c", "config/project.yml"]
+CMD ["./service-broker", "-c", "config/services.yml"]

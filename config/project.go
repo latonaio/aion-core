@@ -73,7 +73,7 @@ func GetNextNumber(
 func LoadConfigFromDirectory(configPath string) (*AionSetting, error) {
 	/*
 	 * 本来ならProtocol Bufferで定義されたモデルをそのまま使うべきだが、
-	 * 既存のproject.yamlがProtocol Buffetで表現できない
+	 * 既存のservices.ymlがProtocol Buffetで表現できない
 	 * Protocol Bufferでyaml mappingができない
 	 * という2つの理由から、yaml読み込み用のモデルを定義して読み込んだ後、
 	 * Protocol Bufferで定義されたモデルにマッピングしている。
