@@ -105,7 +105,7 @@ func (msc *controller) startMicroservice(ctx context.Context, name string) error
 
 	for i := 1; i <= ms.GetScale(); i++ {
 		if err := ms.StartMicroservice(i); err != nil {
-			log.Errorf("cannot start microservice (name:%s, num:%d)", name, i)
+			log.Errorf("cannot start microservice (name:%s, num:%d) error:%v", name, i, err)
 		} else {
 			go msc.watcher.WatchMicroservice(ctx, name, i)
 			log.Printf("start microservice: (name:%s, num:%d)", name, i)
