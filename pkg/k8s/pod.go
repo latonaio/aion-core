@@ -99,7 +99,7 @@ func (p *Pod) getContainer() apiV1.Container {
 func (p *Pod) getEnvoyContainer() apiV1.Container {
 	return apiV1.Container{
 		Name:  "envoy",
-		Image: p.k8sEnv.RepositoryPrefix + "/envoy:latest",
+		Image: "envoyproxy/envoy:v1.16-latest",
 		Command: []string{
 			"/usr/local/bin/envoy",
 		},

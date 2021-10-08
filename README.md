@@ -320,7 +320,6 @@ pyhon-base-imagesのREADMEを参照し、これらのベースイメージを準
 ```
 docker login
 docker pull envoyproxy/envoy:v1.16-latest
-docker tag latonaio/envoy:latest localhost:31112/envoy:latest
 ```
 #### 4. 各種マイクロサービスのbuild
 
