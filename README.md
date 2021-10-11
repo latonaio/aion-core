@@ -109,13 +109,13 @@ Data Sweeperは、マイクロサービスが生成した不要なファイル�
 AIONでは以下のミドルウェアとフレームワークを採用しております。 
 
 - [Envoy](https://github.com/latonaio/envoy)
-- Redis
-- MongoDB
-- MySQL
-- WebRTC
-- gRPC
-- RabbitMQ
-- ReactJS
+- [Redis](https://github.com/latonaio/redis-cluster-kube)
+- [MongoDB](https://github.com/latonaio/mongodb-kube)
+- [MySQL](https://github.com/latonaio/mysql-kube)
+- [WebRTC](https://github.com/latonaio/webrtc)
+- [gRPC](https://github.com/latonaio/grpc-io)
+- [RabbitMQ](https://github.com/latonaio/rabbitmq-for-kubernetes)
+- [ReactJS](https://github.com/latonaio/react-js)
 
 ### Envoy
 
@@ -132,7 +132,7 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 
 * フロントエンドで発生した動的データを保持
 
-### MongoDB
+### MongoDB  
 
 MongoDBはNoSQLの一種でドキュメント指向データベースと言われるDBです。スキーマレスでデータを保存し、永続化をサポートしています。 AIONでは、各マイクロサービスのLogをKanban
 Replicatorを通して保存する役割を担っています。
@@ -286,7 +286,7 @@ sudo vi /etc/docker/daemon.json
 }
 ```
 
-#### 5. os再起動
+#### 5. OS再起動
 
 ```shell
 source ~/.bashrc
