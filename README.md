@@ -5,7 +5,7 @@ aion-coreはマイクロサービスプラットフォームであるAIONを動�
 aion-coreはAIONプラットフォーム上でマイクロサービスを動作させるために、以下のリソースを提供しています。
 
 * AIONのメインコンポーネント
-* マイクロサービスで利用するライブラリ
+* マイクロサービス等で利用されるライブラリ
 * kubernetesへのデプロイに必要な設定ファイル
 
 また、aion-coreは単体のマシンで動作するシングルモードと、複数のマシン間でクラスタ構成をとるクラスタモードの２通りでの動作が可能です。
@@ -46,7 +46,7 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
     * [aion-core-manifestsのビルド・修正(シングルモード/クラスタモードで異なります)](#aion-core-manifestsのビルド・修正(シングルモード/クラスタモードで異なります))
 * [Master Nodeの構築(シングルモード/クラスタモードのMaster)](#Master-nodeの構築)
     * [1.Kubeadmでセットアップ](#1kubeadmでセットアップ)
-    * [2.Flannelのコンテナをデプロイする](#2flannelのコンテナをデプロイする)
+    * [2.Flannelをデプロイする](#2flannelをデプロイする)
     * [3.Master Nodeの隔離を無効にする](#3master-nodeの隔離を無効にする)
     * [4.Master Nodeがクラスターに参加していることを確認する](#4master-nodeがクラスターに参加していることを確認する)
     * [5.(クラスタモードのみ)aionctlのインストール](#aionctlのインストール)
@@ -245,7 +245,7 @@ sudo systemctl restart docker
 
 #### 2. kubeadm、kubelet、kubectlをインストール
 
-Kubernentsクラスターを構築するツールであるKubeadmを用いてセットアップを行います。
+Kubernetesクラスターを構築するツールであるKubeadmを用いてセットアップを行います。
 
 ```
 sudo apt update && sudo apt install -y apt-transport-https curl
@@ -487,7 +487,7 @@ redis-cluster : Redisサーバ
 
 ### 1.Kubeadmでセットアップ
 
-KubernentsのMaster Nodeのセットアップを行いますが、ホスト側のIPアドレスがKubernentesの設定ファイルに書き込まれるため、静的IPアドレスを設定しておくことをおすすめします。
+KubernetesのMaster Nodeのセットアップを行いますが、ホスト側のIPアドレスがKubernentesの設定ファイルに書き込まれるため、静的IPアドレスを設定しておくことをおすすめします。
 
 ```
 sudo kubeadm init --pod-network-cidr=10.244.10.0/16
@@ -498,9 +498,9 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 ※「apiserver-cert-extra-sans」オプションは外部サーバからkubectlで接続したい場合、接続元のIPアドレスを入力する項目になります（不要であればオプションごと削除して構いません）
 
-### 2.Flannelのコンテナをデプロイする
+### 2.Flannelをデプロイする
 
-ポッド間の通信を行うためのコンテナがクラスター上にデプロイされていないためCNIのネットワークアドオンをデプロイする。
+Kubernetesにレイヤー3通信を実装するために、また、ポッド間の通信を行うために、Flannelをデプロイします。  
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/2140ac876ef134e0ed5af15c65e414cf26827915/Documentation/kube-flannel.yml
