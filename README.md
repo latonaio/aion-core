@@ -24,11 +24,11 @@ aion-coreはAIONプラットフォーム上でマイクロサービスを動作�
 * [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
     * [Envoy](#Envoy)
     * [Redis](#redis)
+    * [RabbitMQ](#RabbitMQ)    
     * [MongoDB](#mongodb)
     * [MySQL](#MySQL)
     * [WebRTC](#WebRTC)
     * [gRPC](#gRPC)
-    * [RabbitMQ](#RabbitMQ)
     * [ReactJS](#ReactJS)
 * [AIONを用いたシステム構成の例](#AIONを用いたシステム構成の例)
     * [AION のメッセージングアーキテクチャの一例（RabbitMQ）](#AIONのメッセージングアーキテクチャの一例（RabbitMQ）)
@@ -115,11 +115,11 @@ AIONでは以下のミドルウェアとフレームワークを採用してお�
 
 - [Envoy](https://github.com/latonaio/envoy)
 - [Redis](https://github.com/latonaio/redis-cluster-kube)
+- [RabbitMQ](https://github.com/latonaio/rabbitmq-on-kubernetes)
 - [MongoDB](https://github.com/latonaio/mongodb-kube)
 - [MySQL](https://github.com/latonaio/mysql-kube)
 - [WebRTC](https://github.com/latonaio/webrtc)
 - [gRPC](https://github.com/latonaio/grpc-io)
-- [RabbitMQ](https://github.com/latonaio/rabbitmq-for-kubernetes)
 - [ReactJS](https://github.com/latonaio/react-js)
 
 ### Envoy
@@ -136,6 +136,11 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 * 各マイクロサービスで利用できるデータキャッシュサーバ
 
 * フロントエンドで発生した動的データを保持
+
+### RabbitMQ
+
+AIONでは、メッセージングアーキテクチャの一構成例として、RabbitMQを用いてキューを用いた非同期処理を行います。詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
+AIONでは、RabbitMQ はマイクロサービスとして機能します。  
 
 ### MongoDB  
 
@@ -155,11 +160,6 @@ AIONでは、ブラウザで利用可能な API として、ビデオ、音声�
 ### gRPC
 
 AIONでは、あるマイクロサービスからのリクエストに対して応答し、別のマイクロサービスへ送信することで、双方のマイクロサービスが通信をできるようにします。
-
-### RabbitMQ
-
-AIONでは、メッセージングアーキテクチャの一構成例として、RabbitMQを用いてキューを用いた非同期処理を行います。詳しくは[こちら](https://github.com/latonaio/rabbitmq-for-kubernetes)を参照してください。
-AIONでは、RabbitMQ はマイクロサービスとして機能します。  
 
 ### ReactJS
 
