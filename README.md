@@ -24,16 +24,16 @@ aion-core の動作方法として、単体のマシンで動作するシング�
     * [Send Anything](#Send-Anything)
     * [その他](#その他)
 * [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
-    * [Envoy](#Envoy)
+    * [RabbitMQ](#RabbitMQ) 
     * [Redis](#redis)
-    * [RabbitMQ](#RabbitMQ)    
+    * [Envoy](#Envoy)  
     * [MongoDB](#mongodb)
     * [MySQL](#MySQL)
     * [WebRTC](#WebRTC)
     * [gRPC](#gRPC)
     * [ReactJS](#ReactJS)
 * [AIONを用いたシステム構成の例](#AIONを用いたシステム構成の例)
-    * [AION のメッセージングアーキテクチャの一例（RabbitMQ）](#AIONのメッセージングアーキテクチャの一例（RabbitMQ）)
+    * [AION のメッセージングアーキテクチャ（RabbitMQ）](#AIONのメッセージングアーキテクチャ（RabbitMQ）)
     * [AION のアーキテクチャの一例（WebRTC）](#AIONのアーキテクチャの一例（WebRTC）)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
@@ -115,21 +115,21 @@ AIONでは、Data Sweeper はそれ自体がマイクロサービスとして機
 
 AIONでは以下のミドルウェアとフレームワークを採用しております。 
 
-- [Envoy](https://github.com/latonaio/envoy)
-- [Redis](https://github.com/latonaio/redis-cluster-kube)
 - [RabbitMQ](https://github.com/latonaio/rabbitmq-on-kubernetes)
+- [Redis](https://github.com/latonaio/redis-cluster-kube)
+- [Envoy](https://github.com/latonaio/envoy)
 - [MongoDB](https://github.com/latonaio/mongodb-kube)
 - [MySQL](https://github.com/latonaio/mysql-kube)
 - [WebRTC](https://github.com/latonaio/webrtc)
 - [gRPC](https://github.com/latonaio/grpc-io)
 - [ReactJS](https://github.com/latonaio/react-js)
 
-### Envoy
+### RabbitMQ
 
-Envoy はマイクロサービス間のネットワーク制御をライブラリとしてではなく、ネットワークプロキシとして提供します。
-AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。
-
-AIONでは、Envoy はマイクロサービスとして機能します。  
+AIONでは、AION がカンバンシステムと呼んでいる、マイクロサービス間のメッセージングアーキテクチャのコアアーキテクチャとして、RabbitMQ を採用しています。    
+AION のカンバンシステムは、コンピューティングリソースとストレージリソースが制限されたエッジ環境で、1/10/100ミリ秒のタイムサイクルでエンドポイントにおけるマイクロサービス間の効率的・安定的処理をつかさどる、軽量なメッセージングアーキテクチャです。  
+RabbitMQ について、詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
+AIONでは、RabbitMQ はマイクロサービスとして機能します。 
 
 ### Redis
 
@@ -143,10 +143,12 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 
 AIONでは、Redis（RedisCluster）はマイクロサービスとして機能します。  
 
-### RabbitMQ
+### Envoy
 
-AIONでは、メッセージングアーキテクチャの一構成例として、RabbitMQを用いてキューを用いた非同期処理を行います。詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
-AIONでは、RabbitMQ はマイクロサービスとして機能します。  
+Envoy はマイクロサービス間のネットワーク制御をライブラリとしてではなく、ネットワークプロキシとして提供します。
+AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。
+
+AIONでは、Envoy はマイクロサービスとして機能します。   
 
 ### MongoDB  
 
@@ -175,7 +177,7 @@ ReactJSはコンポーネントベースで、大規模なJavaScriptコードを
 
 ## AIONを用いたシステム構成の例
 
-### AIONのメッセージングアーキテクチャの一例（RabbitMQ）
+### AIONのメッセージングアーキテクチャ（RabbitMQ）
 
 AION がマイクロサービスの起動を行い、マイクロサービス間の通信を RabbitMQ で管理します。
 RabbitMQ での通信により長時間安定したシステムが実現されます。
@@ -183,7 +185,7 @@ RabbitMQ での通信により長時間安定したシステムが実現され�
 (例えば、gRPCのような、より重厚なメッセージングアーキテクチャを採用する場合、もしくは、gRPCとRabbitMQを組み合わせる場合の方が適切なときもあります)
 ![マイクロサービス構成の例1](documents/aion-core-example1.drawio.png)
 
-### AIONのアーキテクチャの一例（WebRTC）
+### AIONのアーキテクチャ（WebRTC）
 
 AION のフロントエンドにWebRTCを実装して、フロントエンド／ブラウザからバックエンドサービス等へ、ビデオ・音声など、任意のデータ入力を、リアルタイムに送信することができます。   
 ![マイクロサービス構成の例2](documents/aion-core-example2.png)
