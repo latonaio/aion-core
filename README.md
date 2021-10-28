@@ -25,6 +25,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
     * [その他](#その他)
 * [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
     * [RabbitMQ](#RabbitMQ) 
+    * [Fluentd](#Fluentd)  
     * [Redis](#redis)
     * [Envoy](#Envoy)  
     * [MongoDB](#mongodb)
@@ -118,6 +119,7 @@ AIONでは、Data Sweeper はそれ自体がマイクロサービスとして機
 AIONでは以下のミドルウェアとフレームワークを採用しております。 
 
 - [RabbitMQ](https://github.com/latonaio/rabbitmq-on-kubernetes)
+- [Fluentd]()  
 - [Redis](https://github.com/latonaio/redis-cluster-kube)
 - [Envoy](https://github.com/latonaio/envoy)
 - [MongoDB](https://github.com/latonaio/mongodb-kube)
@@ -132,6 +134,12 @@ AIONでは、AION がカンバンシステムと呼んでいる、マイクロ�
 AION のカンバンシステムは、コンピューティングリソースとストレージリソースが制限されたエッジ環境で、1/10/100ミリ秒のタイムサイクルでエンドポイントにおけるマイクロサービス間の効率的・安定的処理をつかさどる、軽量なメッセージングアーキテクチャです。  
 RabbitMQ について、詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
 AIONでは、RabbitMQ はマイクロサービスとして機能します。 
+
+### Fluentd  
+
+Fluentdは大量のログファイルを収集、解析し、ストレージに集約、保存を行うことができるオープンソースのデータコレクタです。  
+AIONでは、Fluentdを用いてマイクロサービス単位で対象Podのログを監視し、必要なログをデータベースに保存します。  
+AIONでは、Fluentd はマイクロサービスとして機能します。
 
 ### Redis
 
