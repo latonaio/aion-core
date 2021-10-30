@@ -119,7 +119,7 @@ AIONでは、Data Sweeper はそれ自体がマイクロサービスとして機
 AIONでは以下のミドルウェアとフレームワークを採用しております。 
 
 - [RabbitMQ](https://github.com/latonaio/rabbitmq-on-kubernetes)
-- [Fluentd]()  
+- [Fluentd](https://github.com/latonaio/fluentd-for-containers-mongodb-kube)    
 - [Redis](https://github.com/latonaio/redis-cluster-kube)
 - [Envoy](https://github.com/latonaio/envoy)
 - [MongoDB](https://github.com/latonaio/mongodb-kube)
