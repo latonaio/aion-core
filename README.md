@@ -36,7 +36,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONを用いたシステム構成の例](#AIONを用いたシステム構成の例)
     * [AION のメッセージングアーキテクチャ（RabbitMQ）](#AIONのメッセージングアーキテクチャ（RabbitMQ）)
     * [AION のアーキテクチャの一例（WebRTC）](#AIONのアーキテクチャの一例（WebRTC）)
-* [AION-Core等のランタイム環境](#AION-Core等のランタイム環境)
+* [AIONのランタイム環境](#AIONのランタイム環境)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
@@ -202,10 +202,12 @@ RabbitMQ での通信により長時間安定したシステムが実現され�
 AION のフロントエンドにWebRTCを実装して、フロントエンド／ブラウザからバックエンドサービス等へ、ビデオ・音声など、任意のデータ入力を、リアルタイムに送信することができます。   
 ![マイクロサービス構成の例2](documents/aion-core-example2.png)
 
-## AION-Core等のランタイム環境  
-AION-Core および data-sweeper-kube のランタイム環境は、[Golang](https://github.com/golang/go) で開発されています。  
-AION の その他のマイクロサービス等のランタイム環境は、[Golang](https://github.com/golang/go)、[Node.js](https://github.com/nodejs)、[Python](https://github.com/python)で開発されています。  
-AIONプラットフォームにおける マイクロサービス等のランタイム環境として、上記以外のランタイム環境(例：cpp、[Vue.js](https://github.com/vuejs))を選択肢として実装することができます。    
+## AIONのランタイム環境  
+
+* AION-Core および data-sweeper-kube のランタイム環境は、[Golang](https://github.com/golang/go) で開発実装されています。  
+* AION の その他のマイクロサービス等のランタイム環境は、[Golang](https://github.com/golang/go)、[Node.js](https://github.com/nodejs)、[Python](https://github.com/python)で開発実装されています。  
+* AIONプラットフォームにおける マイクロサービス等のランタイム環境として、上記以外の(または上記に加えて)任意のランタイム環境(例：[Rust](https://github.com/rust-lang)、C++、[Vue.js](https://github.com/vuejs))を選択肢として開発実装することができます。    
+* AION では、例えば1つのエッジデバイス内などの、エッジコンピューティング環境等の制約されたリソース環境において、マイクロサービス等の要求仕様等に応じたプログラムの特性に合わせた、様々なランタイム環境を組み合わせて選択して開発実装することができます。  
 
 ## シングルモードとクラスタモード
 
