@@ -36,6 +36,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONを用いたシステム構成の例](#AIONを用いたシステム構成の例)
     * [AION のメッセージングアーキテクチャ（RabbitMQ）](#AIONのメッセージングアーキテクチャ（RabbitMQ）)
     * [AION のアーキテクチャの一例（WebRTC）](#AIONのアーキテクチャの一例（WebRTC）)
+* [AION-Core等のランタイム環境](#AION-Core等のランタイム環境)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
@@ -84,9 +85,10 @@ AIONは、100% Linux のオープンソース環境をベースとして構築�
 
 ![マイクロサービス構成の例0](documents/aion-core-architecture.png)
 
-## AIONの主要構成
+## AIONの主要構成  
 
 AIONでは、主要構成として以下があります。 
+Service Broker、Status Kanban および Kanban Replicator、Send Anything は、aion-core に含まれます。  
 
 - Service Broker
 - Status Kanban および Kanban Replicator
@@ -199,6 +201,11 @@ RabbitMQ での通信により長時間安定したシステムが実現され�
 
 AION のフロントエンドにWebRTCを実装して、フロントエンド／ブラウザからバックエンドサービス等へ、ビデオ・音声など、任意のデータ入力を、リアルタイムに送信することができます。   
 ![マイクロサービス構成の例2](documents/aion-core-example2.png)
+
+## AION-Core等のランタイム環境  
+AION-Core および data-sweeper-kube のランタイム環境は、[Golang](https://github.com/golang/go) で開発されています。  
+AION の その他のマイクロサービス等のランタイム環境は、[Golang](https://github.com/golang/go)、[Node.js](https://github.com/nodejs)、[Python](https://github.com/python)で開発されています。  
+AIONプラットフォームにおける マイクロサービス等のランタイム環境として、上記以外のランタイム環境(例：cpp、[Vue.js](https://github.com/vuejs))を選択肢として実装することができます。    
 
 ## シングルモードとクラスタモード
 
