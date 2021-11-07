@@ -37,6 +37,8 @@ aion-core の動作方法として、単体のマシンで動作するシング�
     * [AION のメッセージングアーキテクチャ（RabbitMQ）](#AIONのメッセージングアーキテクチャ（RabbitMQ）)
     * [AION のアーキテクチャの一例（WebRTC）](#AIONのアーキテクチャの一例（WebRTC）)
 * [AIONのランタイム環境](#AIONのランタイム環境)
+* [AIONプラットフォームのレポジトリの分類](#AIONプラットフォームのレポジトリの分類)
+* [部品として使えるAIONプラットフォームのレポジトリ](#部品として使えるAIONプラットフォームのレポジトリ)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
@@ -204,6 +206,36 @@ AION のフロントエンドにWebRTCを実装して、フロントエンド／
 * AION の 個別マイクロサービス等のランタイム環境は、[Golang](https://github.com/golang/go)、[Node.js](https://github.com/nodejs)、[Python](https://github.com/python)で開発実装されています。  
 * AIONプラットフォームにおける 個別マイクロサービス等のランタイム環境として、上記以外の(または上記に加えて)任意のランタイム環境(例：[Rust](https://github.com/rust-lang)、C++、[Vue.js](https://github.com/vuejs))を選択肢として開発実装することができます。    
 * AION では、例えば1つのエッジデバイス内などの、エッジコンピューティング環境等の制約されたリソース環境において、個別マイクロサービス等の要求仕様等に応じたプログラムの特性に合わせた、様々なランタイム環境を組み合わせて選択して開発実装することができます。  
+
+## AIONプラットフォームのレポジトリの分類  
+AION プラットフォームのレポジトリは、次の分類に分かれます。  
+以下の全てのレポジトリ分類に含まれるレポジトリは、主にエッジコンピューティング環境において、AIONのアーキテクチャの中で、もしくは、それぞれマイクロサービスとして、安定動作します。また、クラウド環境でも利用できます。  
+
+* AION-Core with Kubernetes(主にエッジコンピューティング環境においてKubernetesとマイクロサービスアーキテクチャを安定的に動作させるためのコア環境）  
+* Data Sweeper on Kubernetes  
+* AION-Core Manifests に含まれる AION の関連主要リソース(AIONで動くRabbitMQ/Fluentd/Redis/Envoy/MongoDB 等のリソース)
+* RabbitMQ on Kubernetes  
+* RabbitMQ の Golang, Nodejs, Python ランタイム用ライブラリ 
+* Fluentd on Kubernetes と 関連するログ収集用レポジトリ
+* Golang, Python ランタイム用 Loggerライブラリ  
+* RedisCluster on Kubernetes    
+* Envoy with Kubernetes   
+* MySQL on Kubernetes  
+* MongoDB / Mongo-Express on Kubernetes
+* Face Recognition 関連のリソース(Azure Face API 等を用いたマイクロサービス群)
+* Load Balancer(for Movable Devices) on Kubernetes
+* Container Deployment System と、それに含まれる個々のマイクロサービス  
+* Omotebako System と、それに含まれる個々のマイクロサービス  
+* SAP 関連 レポジトリ(api-integrations や SQL)  
+* その他の個別マイクロサービス
+
+
+## 部品として使えるAIONプラットフォームのレポジトリ  
+AION プラットフォームのレポジトリは、それぞれ1つのマイクロサービスから、部品として利用できます。  
+AION プラットフォームで提供されているオープンソースは、必ずしもAIONの統合環境として利用される必要はありません。  
+したがって、次の図の各Caseのように、各レポジトリ(=マイクロサービス)をそれぞれ組み合わせて開発・実装することができます。  
+
+![AIONプラットフォームのレポジトリ](documents/AION_repository.png)
 
 ## シングルモードとクラスタモード
 
