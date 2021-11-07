@@ -17,7 +17,8 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [動作環境](#動作環境)
     * [前提条件](#前提条件)
 * [AIONの概要](#AIONの概要)
-* [AIONのアーキテクチャ](#AIONのアーキテクチャ)
+* [AIONのアーキテクチャ１](#AIONのアーキテクチャ１)
+* [AIONのアーキテクチャ２](#AIONのアーキテクチャ２)
 * [AIONの主要構成](#AIONの主要構成)
     * [Service Broker](#Service-Broker)
     * [Status Kanban および Kanban Replicator](#Status-Kanban-および-Kanban-Replicator)
@@ -79,7 +80,11 @@ aion-coreならびに関連リソースならびにエッジアプリケーシ�
 AIONは、100% Linux のオープンソース環境をベースとして開発・構築された、主にエッジコンピューティングのための、マイクロサービス志向のコンピューティング・プラットフォーム環境です。     
 エッジ端末内において、ほぼ全てのマイクロサービス・ミドルウェアがコンテナ化されコンテナオーケストレーションシステムのKubernetesによって制御・監視されています。  
 
-## AIONのアーキテクチャ
+## AIONのアーキテクチャ１
+
+![AIONアーキテクチャ概要](documents/aion-architecture-overview.png)
+
+## AIONのアーキテクチャ２
 
 ![マイクロサービス構成の例0](documents/aion-core-architecture.png)
 
@@ -193,7 +198,7 @@ AION がマイクロサービスの起動を行い、マイクロサービス間
 RabbitMQ での通信により長時間安定したシステムが実現されます。
 さらに柔軟性の高さからシステムの拡張を容易に行うことができます。
 (例えば、gRPCのような、より重厚なメッセージングアーキテクチャを採用する場合、もしくは、gRPCとRabbitMQを組み合わせる場合の方が適切なときもあります)
-![マイクロサービス構成の例1](documents/aion-core-example1.drawio.png)
+![マイクロサービス構成の例1](documents/aion_architecture_2.png)
 
 ### AIONのアーキテクチャ（WebRTC）
 
