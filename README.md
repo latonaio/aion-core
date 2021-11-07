@@ -82,7 +82,7 @@ AIONは、100% Linux のオープンソース環境をベースとして開発�
 
 ## AIONのアーキテクチャ１
 
-![AIONアーキテクチャ概要](documents/aion-architecture-overview.png)
+![AIONアーキテクチャ概要](documents/aion_architecture_2.png)
 
 ## AIONのアーキテクチャ２
 
@@ -198,7 +198,7 @@ AION がマイクロサービスの起動を行い、マイクロサービス間
 RabbitMQ での通信により長時間安定したシステムが実現されます。
 さらに柔軟性の高さからシステムの拡張を容易に行うことができます。
 (例えば、gRPCのような、より重厚なメッセージングアーキテクチャを採用する場合、もしくは、gRPCとRabbitMQを組み合わせる場合の方が適切なときもあります)
-![マイクロサービス構成の例1](documents/aion_architecture_2.png)
+![マイクロサービス構成の例1](documents/aion-core-example1.drawio.png)
 
 ### AIONのアーキテクチャ（WebRTC）
 
