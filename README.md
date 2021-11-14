@@ -15,7 +15,6 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 **目次**
 
 * [動作環境](#動作環境)
-    * [前提条件](#前提条件)
 * [AIONの概要](#AIONの概要)
 * [AIONのアーキテクチャ１](#AIONのアーキテクチャ１)
 * [AIONのアーキテクチャ２](#AIONのアーキテクチャ２)
@@ -73,7 +72,7 @@ aion-core、関連リソースならびにエッジアプリケーションや�
 
 * OS: Linux
 * CPU: ARM/AMD/Intel  
-* Memory: 8GB 以上推奨  
+* Memory: 8GB 以上推奨 （Jetson であれば TX2 / NX 以上、Raspberry Pi であれば RP4 8GB Model、が該当します）
 * Storage: 64GB 以上推奨 (OS領域とは別に主にコンテナイメージ実装・稼働のために必要です。通常のエッジ端末で64GBを確保するには、外付けMicroSDやSSDが必要です）   
 
 ## AIONの概要
