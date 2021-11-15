@@ -19,16 +19,17 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONのアーキテクチャ１](#AIONのアーキテクチャ１)
 * [AIONのアーキテクチャ２](#AIONのアーキテクチャ２)
 * [AIONの主要構成](#AIONの主要構成)
-    * [Service Broker](#Service-Broker)
-    * [Status Kanban および Kanban Replicator](#Status-Kanban-および-Kanban-Replicator)
-    * [Send Anything](#Send-Anything)
-    * [その他](#その他)
+    * [Service Broker](#Service Broker)
+    * [Status Kanban および Kanban Replicator](#Status Kanban および Kanban Replicator)
+    * [Send Anything](#Send Anything)
+    * [Data Sweeper](#Data Sweeper)
+    * [Avis](#Avis)
 * [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
     * [RabbitMQ](#RabbitMQ) 
     * [Fluentd](#Fluentd)  
-    * [Redis](#redis)
+    * [Redis](#Redis)
     * [Envoy](#Envoy)  
-    * [MongoDB](#mongodb)
+    * [MongoDB](#MongoDB)
     * [MySQL](#MySQL)
     * [WebRTC](#WebRTC)
     * [gRPC](#gRPC)
@@ -95,28 +96,36 @@ Service Broker、Status Kanban および Kanban Replicator、Send Anything は�
 - Service Broker
 - Status Kanban および Kanban Replicator
 - Send Anything
-- その他
+- Data Sweeper
+- Avis
 
 ### Service Broker
  
-Service Brokerは、AION™のコア機能で、主にエッジコンテナオーケストレーション環境でのマイクロサービスの実行に関する統括制御をつかさどるモジュールです。  
+[Service Broker](https://github.com/latonaio/aion-core/tree/main/cmd/service-broker)は、AION™のコア機能で、主にエッジコンテナオーケストレーション環境でのマイクロサービスの実行に関する統括制御をつかさどるモジュールです。  
 AIONでは、Service Broker はそれ自体がマイクロサービスとして機能します。  
  
 ### Status Kanban および Kanban Replicator
  
-Status Kanban および Kanban Replicatorは、それぞれAION™のコア機能の1つで、マイクロサービス間のかんばんのやりとりを制御します。AION™　にはカンバンロジックがあらかじめ含まれているため、コンピューティングリソースとストレージリソースが制限されたエッジで、1、10、または100ミリ秒のタイムサイクルでエンドポイントの高性能処理を実行できます。マイクロサービス（マイクロサービスA>マイクロサービスB>マイクロサービスCなど）の各連続処理に割り当てられたAまたは一部のカンバンカードは、エッジでのIoTおよびAI処理における大量の同時注文の一貫性とモデレーションを厳密に維持します。    
+[Status Kanban](https://github.com/latonaio/aion-core/tree/main/cmd/kanban-server) および [Kanban Replicator](https://github.com/latonaio/aion-core/tree/main/cmd/kanban-replicator)は、それぞれAION™のコア機能の1つで、マイクロサービス間のかんばんのやりとりを制御します。AION™　にはカンバンロジックがあらかじめ含まれているため、コンピューティングリソースとストレージリソースが制限されたエッジで、1、10、または100ミリ秒のタイムサイクルでエンドポイントの高性能処理を実行できます。マイクロサービス（マイクロサービスA>マイクロサービスB>マイクロサービスCなど）の各連続処理に割り当てられたAまたは一部のカンバンカードは、エッジでのIoTおよびAI処理における大量の同時注文の一貫性とモデレーションを厳密に維持します。    
 AIONでは、Status Kanban および Kanban Replicator は各々それ自体がマイクロサービスとして機能します。  
 
 ### Send Anything
  
-Send Anythingは、エッジのAION™プラットフォームでソフトウェアのコアスタック専用に機能する統合カンバンネイティブデータ処理システムを提供します。  
+[Send Anything](https://github.com/latonaio/aion-core/tree/main/cmd/send-anything)は、エッジのAION™プラットフォームでソフトウェアのコアスタック専用に機能する統合カンバンネイティブデータ処理システムを提供します。  
 Send Anything によるクロスデバイスかんばん処理システムは、AION™サービスブローカーによってオーケストレーションされ、多数のネットワークノード全体で、マイクロサービス指向アーキテクチャのデータ処理/インターフェースとアプリケーションのランタイムの柔軟なパターンを可能にします。  
 AIONでは、Send Anything はそれ自体がマイクロサービスとして機能します。  
 
-### その他
+### Data Sweeper
  
-Data Sweeperは、マイクロサービスが生成した不要なファイルを定期的に削除する機能を提供します。これにより、ストレージリソースをクリーンアップして、エッジアプリケーションの実行時環境を安定かつ適度に保つことが可能になります。また、Data Sweeperはセキュリティブローカーとしても機能し、デバイス上の個人情報を自動的に消去することで、非常に安全なエッジ環境を確保し、個人のデータが外部に漏洩しないようにします。data-sweeper-kubeを立ち上げる場合は[こちら](https://github.com/latonaio/data-sweeper-kube)を参照してください。   
+[Data Sweeper](https://github.com/latonaio/data-sweeper-kube)は、マイクロサービスが生成した不要なファイルを定期的に削除する機能を提供します。これにより、ストレージリソースをクリーンアップして、エッジアプリケーションの実行時環境を安定かつ適度に保つことが可能になります。また、Data Sweeperはセキュリティブローカーとしても機能し、デバイス上の個人情報を自動的に消去することで、非常に安全なエッジ環境を確保し、個人のデータが外部に漏洩しないようにします。     
 AIONでは、Data Sweeper はそれ自体がマイクロサービスとして機能します。  
+
+### Avis  
+
+[Avis](https://github.com/latonaio/avis)は、Fluentdを用いてマイクロサービスログやアクセスログ、システムログ等を収集し、収集されたログから重要なログをピックアップしてUI上に表示します。  
+UI は Electron をベースとしており、カスタマイズが容易で、直感的で洗練されたUIとなっています。  
+AIONでは、Avis はそれ自体がマイクロサービスとして機能します。  
+
 
 ## AIONにおけるミドルウェアとフレームワーク
 
@@ -135,59 +144,65 @@ AIONでは以下のミドルウェアとフレームワークを採用してお�
 ### RabbitMQ
 
 AIONでは、AION がカンバンシステムと呼んでいる、マイクロサービス間のメッセージングアーキテクチャのコアアーキテクチャとして、RabbitMQ を採用しています。    
-AION のカンバンシステムは、コンピューティングリソースとストレージリソースが制限されたエッジ環境で、1/10/100ミリ秒のタイムサイクルでエンドポイントにおけるマイクロサービス間の効率的・安定的処理をつかさどる、軽量なメッセージングアーキテクチャです。  
+AION のカンバンシステムは、コンピューティングリソースとストレージリソースが制限されたエッジ環境で、1/10/100ミリ秒のタイムサイクルでエンドポイントにおけるマイクロサービス間の効率的・安定的処理をつかさどる、軽量なメッセージングアーキテクチャです。    
+AIONでは、RabbitMQ はマイクロサービスとして機能します。  
 RabbitMQ について、詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
-AIONでは、RabbitMQ はマイクロサービスとして機能します。 
 
 ### Fluentd  
 
 Fluentdは大量のログファイルを収集、解析し、ストレージに集約、保存を行うことができるオープンソースのデータコレクタです。  
 AIONでは、Fluentdを用いてマイクロサービス単位で対象Podのログを監視し、必要なログをデータベースに保存します。  
-AIONでは、Fluentd はマイクロサービスとして機能します。
+AIONでは、Fluentd はマイクロサービスとして機能します。  
+Fluentd について、詳しくは[こちら](https://github.com/latonaio/fluentd-core-kube)を参照してください。  
 
 ### Redis
 
 Redisは高速で永続化可能なインメモリデータベースです。AIONでは、主に以下の用途でRedisを利用しています。
 
 * マイクロサービス間のメッセージデータの受け渡し
-
 * マイクロサービスで常時利用可能なデータキャッシュ
-
 * フロントエンドUIで発生した動的データを保持
 
 AIONでは、Redis（RedisCluster）はマイクロサービスとして機能します。  
+Redis について、詳しくは[こちら](https://github.com/latonaio/redis-cluster-kube)を参照してください。  
 
 ### Envoy
 
 Envoy はマイクロサービス間のネットワーク制御をライブラリとしてではなく、ネットワークプロキシとして提供します。
-AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。
-
+AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。  
 AIONでは、Envoy はマイクロサービスとして機能します。   
+Envoy について、詳しくは[こちら](https://github.com/latonaio/envoy)を参照してください。  
 
 ### MongoDB  
 
 MongoDBはNoSQLの一種でドキュメント指向データベースと言われるDBです。スキーマレスでデータを保存し、永続化をサポートしています。 AIONでは、各マイクロサービスのLogをKanban
 Replicatorを通して保存する役割を担っています。  
 AIONでは、MongoDB はマイクロサービスとして機能します。  
+MongoDB について、詳しくは[こちら](https://github.com/latonaio/mongodb-kube)を参照してください。  
 
 ### MySQL
 
-AIONでは、主にフロントエンドUIで発生した静的データが保持されます。mysqlを立ち上げる場合は[こちら](https://github.com/latonaio/mysql-kube) を参照してください。  
+AIONでは、主にフロントエンドUIで発生した静的データが保持されます。  
 AIONでは、MySQL はマイクロサービスとして機能します。  
+MySQL について、詳しくは[こちら](https://github.com/latonaio/mysql-kube)を参照してください。  
 
 ### WebRTC
 
-AIONでは、ブラウザで利用可能な API として、ビデオ、音声、および一般的なデータをリアルタイムにやり取りすることができます。
+AIONでは、ブラウザで利用可能な API として、ビデオ、音声、および一般的なデータをリアルタイムにやり取りすることができます。  
+WebRTC について、詳しくは[こちら](https://github.com/latonaio/webrtc)を参照してください。  
 
 ### gRPC
 
-AIONでは、あるマイクロサービスからのリクエストに対して応答し、別のマイクロサービスへ送信することで、双方のマイクロサービスが通信をできるようにします。
+AIONでは、あるマイクロサービスからのリクエストに対して応答し、別のマイクロサービスへ送信することで、双方のマイクロサービスが通信をできるようにします。  
+AIONでは、gRPC はマイクロサービスとして機能します。  
+gRPC について、詳しくは[こちら](https://github.com/latonaio/grpc-io)を参照してください。  
 
 ### ReactJS
 
 ReactJSは、ユーザインタフェース構築のためのJavaScriptライブラリです。   
 AIONからのアウトプットをフロントエンドUIに表示したり、フロントエンドUIからの指示をバックエンド経由でAIONに伝えたりする役割を果たします。
-ReactJSはコンポーネントベースで、大規模なJavaScriptコードを部品化させることで保守性を高めたり、既存のReactコンポーネントを再利用したりできるため、マイクロサービスアーキテクチャに適しています。
+ReactJSはコンポーネントベースで、大規模なJavaScriptコードを部品化させることで保守性を高めたり、既存のReactコンポーネントを再利用したりできるため、マイクロサービスアーキテクチャに適しています。  
+ReactJS について、詳しくは[こちら](https://github.com/latonaio/react-js)を参照してください。  
 
 ## AIONを用いたシステム構成の例
 
@@ -221,16 +236,17 @@ AION プラットフォームのレポジトリは、次の分類に分かれま
 * RabbitMQ on Kubernetes  
 * RabbitMQ の Golang, Nodejs, Python ランタイム用ライブラリ 
 * Fluentd on Kubernetes と 関連するログ収集用レポジトリ
+* Avis(Frontend を Electron、Backend を Fluentd として IoT のログを収集するマイクロサービスアプリケーション)  
 * Golang, Python ランタイム用 Loggerライブラリ  
 * RedisCluster on Kubernetes    
 * Envoy with Kubernetes   
 * MySQL on Kubernetes  
-* MongoDB / Mongo-Express on Kubernetes
+* MongoDB / Mongo-Express on Kubernetes  
 * Face Recognition 関連のリソース(Azure Face API 等を用いたマイクロサービス群)
 * Load Balancer(for Movable Devices) on Kubernetes
 * Container Deployment System と、それに含まれる個々のマイクロサービス  
 * Omotebako System と、それに含まれる個々のマイクロサービス  
-* SAP 関連 レポジトリ(api-integrations や SQL)  
+* SAP 関連 レポジトリ(Api-Integrations や SQL)  
 * その他の個別マイクロサービス
 
 
