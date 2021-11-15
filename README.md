@@ -20,7 +20,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONのアーキテクチャ２](#AIONのアーキテクチャ２)
 * [AIONの主要構成](#AIONの主要構成)
     * [Service Broker](#ServiceBroker)
-    * [Status Kanban および Kanban Replicator](#StatusKanban および KanbanReplicator)
+    * [Status Kanban および Kanban Replicator](#StatusKanbanおよびKanbanReplicator)
     * [Send Anything](#SendAnything)
     * [Data Sweeper](#DataSweeper)
     * [Avis](#Avis)
