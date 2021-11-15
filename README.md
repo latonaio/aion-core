@@ -19,10 +19,10 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONのアーキテクチャ１](#AIONのアーキテクチャ１)
 * [AIONのアーキテクチャ２](#AIONのアーキテクチャ２)
 * [AIONの主要構成](#AIONの主要構成)
-    * [Service Broker](#Service Broker)
-    * [Status Kanban および Kanban Replicator](#Status Kanban および Kanban Replicator)
-    * [Send Anything](#Send Anything)
-    * [Data Sweeper](#Data Sweeper)
+    * [Service Broker](#ServiceBroker)
+    * [Status Kanban および Kanban Replicator](#StatusKanban および KanbanReplicator)
+    * [Send Anything](#SendAnything)
+    * [Data Sweeper](#DataSweeper)
     * [Avis](#Avis)
 * [AIONにおけるミドルウェアとフレームワーク](#AIONにおけるミドルウェアとフレームワーク)
     * [RabbitMQ](#RabbitMQ) 
@@ -82,7 +82,7 @@ AIONは、100% Linux のオープンソース環境をベースとして開発�
 
 ## AIONのアーキテクチャ１
 
-![AIONアーキテクチャ概要](documents/aion_architecture_2.png)
+![AIONアーキテクチャ概要](documents/aion_architecture_1115.png)
 
 ## AIONのアーキテクチャ２
 
@@ -131,15 +131,15 @@ AIONでは、Avis はそれ自体がマイクロサービスとして機能し�
 
 AIONでは以下のミドルウェアとフレームワークを採用しております。 
 
-- [RabbitMQ](https://github.com/latonaio/rabbitmq-on-kubernetes)
-- [Fluentd](https://github.com/latonaio/fluentd-for-containers-mongodb-kube)    
-- [Redis](https://github.com/latonaio/redis-cluster-kube)
-- [Envoy](https://github.com/latonaio/envoy)
-- [MongoDB](https://github.com/latonaio/mongodb-kube)
-- [MySQL](https://github.com/latonaio/mysql-kube)
-- [WebRTC](https://github.com/latonaio/webrtc)
-- [gRPC](https://github.com/latonaio/grpc-io)
-- [ReactJS](https://github.com/latonaio/react-js)
+- [RabbitMQ](https://github.com/rabbitmq?q=core&type=&language=&sort=)  
+- [Fluentd](https://github.com/fluent)    
+- [Redis](https://github.com/redis)
+- [Envoy](https://github.com/envoyproxy)
+- [MongoDB](https://github.com/mongodb)  
+- [MySQL](https://github.com/mysql)
+- [WebRTC](https://github.com/webrtc)
+- [gRPC](https://github.com/grpc)
+- [ReactJS](https://github.com/reactjs)
 
 ### RabbitMQ
 
