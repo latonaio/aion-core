@@ -18,6 +18,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONの概要](#AIONの概要)
 * [AIONのアーキテクチャ１](#AIONのアーキテクチャ１)
 * [AIONのアーキテクチャ２](#AIONのアーキテクチャ２)
+* [AIONのアーキテクチャ３](#AIONのアーキテクチャ３)
 * [AIONの主要構成](#AIONの主要構成)
     * [Service Broker](#ServiceBroker)
     * [Status Kanban および Kanban Replicator](#StatusKanbanおよびKanbanReplicator)
@@ -86,7 +87,11 @@ AIONは、100% Linux のオープンソース環境をベースとして開発�
 
 ## AIONのアーキテクチャ２
 
-![マイクロサービス構成の例0](documents/aion-core-architecture.png)
+![マイクロサービス構成の例0](documents/aion-core-architecture.png)  
+
+## AIONのアーキテクチャ３
+
+![OMOTBAKOアーキテクチャ](documents/omotebako_architecture_20211115.drawio.png)
 
 ## AIONの主要構成  
 
