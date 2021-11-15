@@ -146,14 +146,14 @@ AIONでは以下のミドルウェアとフレームワークを採用してお�
 AIONでは、AION がカンバンシステムと呼んでいる、マイクロサービス間のメッセージングアーキテクチャのコアアーキテクチャとして、RabbitMQ を採用しています。    
 AION のカンバンシステムは、コンピューティングリソースとストレージリソースが制限されたエッジ環境で、1/10/100ミリ秒のタイムサイクルでエンドポイントにおけるマイクロサービス間の効率的・安定的処理をつかさどる、軽量なメッセージングアーキテクチャです。    
 AIONでは、RabbitMQ はマイクロサービスとして機能します。  
-RabbitMQ について、詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
+AIONプラットフォームにおける RabbitMQ について、詳しくは[こちら](https://github.com/latonaio/rabbitmq-on-kubernetes)を参照してください。  
 
 ### Fluentd  
 
 Fluentdは大量のログファイルを収集、解析し、ストレージに集約、保存を行うことができるオープンソースのデータコレクタです。  
 AIONでは、Fluentdを用いてマイクロサービス単位で対象Podのログを監視し、必要なログをデータベースに保存します。  
 AIONでは、Fluentd はマイクロサービスとして機能します。  
-Fluentd について、詳しくは[こちら](https://github.com/latonaio/fluentd-core-kube)を参照してください。  
+AIONプラットフォームにおける Fluentd について、詳しくは[こちら](https://github.com/latonaio/fluentd-core-kube)を参照してください。  
 
 ### Redis
 
@@ -164,45 +164,45 @@ Redisは高速で永続化可能なインメモリデータベースです。AIO
 * フロントエンドUIで発生した動的データを保持
 
 AIONでは、Redis（RedisCluster）はマイクロサービスとして機能します。  
-Redis について、詳しくは[こちら](https://github.com/latonaio/redis-cluster-kube)を参照してください。  
+AIONプラットフォームにおける Redis について、詳しくは[こちら](https://github.com/latonaio/redis-cluster-kube)を参照してください。  
 
 ### Envoy
 
 Envoy はマイクロサービス間のネットワーク制御をライブラリとしてではなく、ネットワークプロキシとして提供します。
 AION ではネットワーク制御プロキシ、及びネットワークの負荷軽減を目的とするロードバランサーとして採用されています。  
 AIONでは、Envoy はマイクロサービスとして機能します。   
-Envoy について、詳しくは[こちら](https://github.com/latonaio/envoy)を参照してください。  
+AIONプラットフォームにおける Envoy について、詳しくは[こちら](https://github.com/latonaio/envoy)を参照してください。  
 
 ### MongoDB  
 
 MongoDBはNoSQLの一種でドキュメント指向データベースと言われるDBです。スキーマレスでデータを保存し、永続化をサポートしています。 AIONでは、各マイクロサービスのLogをKanban
 Replicatorを通して保存する役割を担っています。  
 AIONでは、MongoDB はマイクロサービスとして機能します。  
-MongoDB について、詳しくは[こちら](https://github.com/latonaio/mongodb-kube)を参照してください。  
+AIONプラットフォームにおける MongoDB について、詳しくは[こちら](https://github.com/latonaio/mongodb-kube)を参照してください。  
 
 ### MySQL
 
 AIONでは、主にフロントエンドUIで発生した静的データが保持されます。  
 AIONでは、MySQL はマイクロサービスとして機能します。  
-MySQL について、詳しくは[こちら](https://github.com/latonaio/mysql-kube)を参照してください。  
+AIONプラットフォームにおける MySQL について、詳しくは[こちら](https://github.com/latonaio/mysql-kube)を参照してください。  
 
 ### WebRTC
 
 AIONでは、ブラウザで利用可能な API として、ビデオ、音声、および一般的なデータをリアルタイムにやり取りすることができます。  
-WebRTC について、詳しくは[こちら](https://github.com/latonaio/webrtc)を参照してください。  
+AIONプラットフォームにおける WebRTC について、詳しくは[こちら](https://github.com/latonaio/webrtc)を参照してください。  
 
 ### gRPC
 
 AIONでは、あるマイクロサービスからのリクエストに対して応答し、別のマイクロサービスへ送信することで、双方のマイクロサービスが通信をできるようにします。  
 AIONでは、gRPC はマイクロサービスとして機能します。  
-gRPC について、詳しくは[こちら](https://github.com/latonaio/grpc-io)を参照してください。  
+AIONプラットフォームにおける gRPC について、詳しくは[こちら](https://github.com/latonaio/grpc-io)を参照してください。  
 
 ### ReactJS
 
 ReactJSは、ユーザインタフェース構築のためのJavaScriptライブラリです。   
 AIONからのアウトプットをフロントエンドUIに表示したり、フロントエンドUIからの指示をバックエンド経由でAIONに伝えたりする役割を果たします。
 ReactJSはコンポーネントベースで、大規模なJavaScriptコードを部品化させることで保守性を高めたり、既存のReactコンポーネントを再利用したりできるため、マイクロサービスアーキテクチャに適しています。  
-ReactJS について、詳しくは[こちら](https://github.com/latonaio/react-js)を参照してください。  
+AIONプラットフォームにおける ReactJS について、詳しくは[こちら](https://github.com/latonaio/react-js)を参照してください。  
 
 ## AIONを用いたシステム構成の例
 
