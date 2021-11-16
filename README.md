@@ -45,9 +45,9 @@ aion-core の動作方法として、単体のマシンで動作するシング�
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
 * [セットアップ(シングルモード/クラスタモード共通)](#セットアップ(シングルモード/クラスタモード共通))
-    * [hostnameの設定](#hostnameの設定)
+    * [Hostnameの設定](#Hostnameの設定)
     * [ディレクトリの作成](#ディレクトリの作成)
-    * [kubernetesのインストール](#1.kubernetesのインストール)
+    * [Kubernetesのインストール](#1.Kubernetesのインストール)
     * [AIONのセットアップ](#AIONのセットアップ)
     * [aion-core-manifestsの配置](#aion-core-manifestsの配置)
     * [services.ymlの設定](#services.ymlの設定)
@@ -280,7 +280,7 @@ Worker node上にworker-aionおよび各マイクロサービスがデプロイ�
 
 ## セットアップ(シングルモード/クラスタモード共通)
 
-### hostnameの設定
+### Hostnameの設定
 
 AIONではLinuxの端末名を頼りに端末間通信を行うため、端末名を一台ごとに異なるものに変えておく必要があります。端末名を変更する場合は以下のコマンドを実行してください。
 
@@ -314,7 +314,7 @@ sudo mkdir -p /var/lib/aion/Data/deployment
 sudo mkdir -p /var/lib/aion/prj/Data
 ```
 
-### kubernetesのインストール
+### Kubernetesのインストール
 
 #### 1. Dockerをインストール&有効化
 
@@ -494,7 +494,7 @@ $ make build-worker HOST={workerのHOSTNAME}
 
 ### 各manifestファイルを修正（クラスタモード）
 
-#### project.ymlの各microserviceに対して、targetNodeパラメータを追加
+#### services.ymlの各microserviceに対して、targetNodeパラメータを追加
 
 ```yaml
 startup: no
