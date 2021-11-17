@@ -5,6 +5,10 @@
 Empowers&nbsp;IoX&nbsp;from&nbsp;a&nbsp;piece&nbsp;of&nbsp;AI.
 </div>
 
+|Empowers IoX from a piece of AI.|
+|:---:|
+
+
 ***  
 
 # aion-core
