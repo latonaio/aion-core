@@ -1,13 +1,9 @@
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/91356865/142147705-341c6bdd-a429-4c0c-87be-e4fa83c0cf40.png"  width="300" title="Empowers&nbsp;IoX&nbsp;from&nbsp;a&nbsp;piece&nbsp;of&nbsp;AI.">
+  <img src="https://user-images.githubusercontent.com/91356865/142165309-df2559c1-1f7e-42d6-b110-f446c1bc8d66.png"  width="300" title="Empowers&nbsp;IoX&nbsp;from&nbsp;a&nbsp;piece&nbsp;of&nbsp;AI.">
 </p>
 <div style="text-align: center;">
 Empowers&nbsp;IoX&nbsp;from&nbsp;a&nbsp;piece&nbsp;of&nbsp;AI.
 </div>
-
-|Empowers IoX from a piece of AI.|
-|:---:|
-
 
 ***  
 
