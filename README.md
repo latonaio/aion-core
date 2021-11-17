@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://user-images.githubusercontent.com/91356865/142165309-df2559c1-1f7e-42d6-b110-f446c1bc8d66.png"  width="300" title="Empowers&nbsp;IoX&nbsp;from&nbsp;a&nbsp;piece&nbsp;of&nbsp;AI.">
 </p>
-<p align="center">>
+<p align="center">
 Empowers&nbsp;IoX&nbsp;from&nbsp;a&nbsp;piece&nbsp;of&nbsp;AI.
 </p>
 
