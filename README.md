@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/91356865/142147705-341c6bdd-a429-4c0c-87be-e4fa83c0cf40.png" />
+</p>
+*** 
 # aion-core
 
 aion-core は、主にエッジコンピューティング向けの マイクロサービスアーキテクチャ・プラットフォームである AION を動作させるのに必要な オープンソースレポジトリ です。
@@ -312,7 +316,10 @@ sudo mkdir -p /var/lib/aion/prj/config
 sudo mkdir -p /var/lib/aion/Data
 sudo mkdir -p /var/lib/aion/Data/deployment
 sudo mkdir -p /var/lib/aion/prj/Data
-```
+```  
+
+なお、本ディレクトリを自動作成することができます。  
+本ディレクトリ自動作成のための定義は、[aion-ansible-unification](https://github.com/latonaio/aion-ansible-unification)内の、roles/aion/tasks/created-directories.yaml にあります。  
 
 ### Kubernetesのインストール
 
