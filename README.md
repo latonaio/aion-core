@@ -91,15 +91,15 @@ AIONは、100% Linux のオープンソース環境をベースとして開発�
 エッジ端末内において、ほぼ全てのマイクロサービス・ミドルウェアがコンテナ化されコンテナオーケストレーションシステムのKubernetesによって制御・監視されています。  
 
 ## AIONのアーキテクチャ１
-
+AION の アーキテクチャ概要図 です。  
 ![AIONアーキテクチャ概要](documents/aion_architecture_1115.png)
 
 ## AIONのアーキテクチャ２
-
+aion-core の メッセージングアーキテクチャ（カンバンシステム） の 図 です。（最新版のAIONでは、status-kanbanとkanban-replicator による メッセージングアーキテクチャは、RabbitMQ に置き換わっています）    
 ![マイクロサービス構成の例0](documents/aion-core-architecture.png)  
 
 ## AIONのアーキテクチャ３
-
+AIONプラットフォームのリソースを実装構築した、エッジコンピューティングアーキテクチャの例（OMOTE-Bakoアプリケーションのアーキテクチャ）です。  
 ![OMOTBAKOアーキテクチャ](documents/omotebako_architecture_20211115.drawio.png)
 
 ## AIONの主要構成  
