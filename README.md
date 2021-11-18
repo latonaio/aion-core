@@ -50,6 +50,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONのランタイム環境](#AIONのランタイム環境)
 * [AIONプラットフォームのレポジトリの分類](#AIONプラットフォームのレポジトリの分類)
 * [部品として使えるAIONプラットフォームのレポジトリ](#部品として使えるAIONプラットフォームのレポジトリ)
+* [AIONプラットフォームにおけるAI/IoT環境のためのデータパイプライン](#AIONプラットフォームにおけるAI/IoT環境のためのデータパイプライン)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
@@ -275,6 +276,11 @@ AIONプラットフォーム で提供されているオープンソースは、
 AIONプラットフォーム では、次の概念図の通り、AI/IoTランタイム環境のために、データパイプラインが定義・供給されます。  
 
 ![data-pipeline](documents/data_pipeline.drawio.png)  
+
+* RabbitMQ: [RabbitMQ on Kubernetes](https://github.com/latonaio/rabbitmq-on-kubernetes) は、AI / IoT のマイクロサービスランタイムに対して、データパイプラインのコアとしてのアーキテクチャとメッセージングキュー構造を提供します。マイクロサービスに対して RabbitMQ on Kubernetes のための必要な設定をすることで、AI / IoT ランタイムの I/Oに対して、高速で安定的なシステム環境が構築されます。  
+* Kubernetes: Kubernetes は、エッジコンピューティングやその他のコンピューティング環境において、多数の AI / IoT のマイクロサービスランタイム が同時安定稼働することを保証します。  
+* AION Service Broker: [AION Service Broker](https://github.com/latonaio/aion-core/tree/main/cmd/service-broker) は、主にエッジコンテナオーケストレーション環境において、AI / IoT マイクロサービスの実行に関する統括制御を行います。  
+* RabbitMQ x Kubernetes x AION Service Broker: これらの洗練された技術が疎結合することにより、AI / IoT 環境のために、統合された安定的なデータパイプラインのアーキテクチャが提供されます。  
 
 ## シングルモードとクラスタモード
 
