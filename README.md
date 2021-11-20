@@ -295,6 +295,9 @@ AIONプラットフォーム では、次の概念図の通り、AI/IoTランタ
 ## AIONプラットフォームにおけるエッジとクラウドとのデータ統合  
 AIONプラットフォーム では、Data Stack / Data Hub として、エッジコンピューティング環境と Azure IoT Hub / Google Cloud IoT Core とのデータ統合が為されます。  
 
+![edge_cloud](documents/edge_cloud.drawio_1120.png)
+
+
 AIONプラットフォームのエッジコンピューティング環境では、主に次の機能が提供されます。  
 
 * Edge Container Orchestrations, Kubernetes on the Edge (Master Node)（エッジコンテナオーケストレーションの機能、エッジにおける Kubernetes Master Node の機能）  
@@ -309,9 +312,7 @@ AIONプラットフォームのエッジコンピューティング環境では�
 * Data Stack / Data Hub の機能
 * Device Management の機能（エッジコンピューティング環境のデバイスと通信接続し、それらのデバイスからデータを取得し可視化する等の機能）  
 * Provisioning の機能（Data Stack / Data Hub や Device Management の環境のプロビジョニング機能）  
-* Bidirectional Communication（エッジコンピューティング環境との双方向通信の機能）  
-
-![edge_cloud](documents/edge_cloud.drawio_1120.png)
+* Bidirectional Communication（エッジコンピューティング環境との双方向通信の機能） 
 
 ## シングルモードとクラスタモード
 
