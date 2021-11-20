@@ -52,6 +52,7 @@ aion-core の動作方法として、単体のマシンで動作するシング�
 * [AIONプラットフォームのレポジトリの分類](#AIONプラットフォームのレポジトリの分類)
 * [部品として使えるAIONプラットフォームのレポジトリ](#部品として使えるAIONプラットフォームのレポジトリ)
 * [AIONプラットフォームにおけるAI/IoT環境のためのデータパイプライン](#AIONプラットフォームにおけるAI/IoT環境のためのデータパイプライン)
+* [AIONプラットフォームにおけるエッジ/クラウド間連携](#AIONプラットフォームにおけるエッジ/クラウド間連携)
 * [シングルモードとクラスタモード](#シングルモードとクラスタモード)
     * [シングルモード](#シングルモード)
     * [クラスタモード](#クラスタモード)
@@ -290,6 +291,27 @@ AIONプラットフォーム では、次の概念図の通り、AI/IoTランタ
 * Kubernetes: Kubernetes は、エッジコンピューティングやその他のコンピューティング環境において、多数の AI / IoT のマイクロサービスランタイム が同時安定稼働することを保証します。  
 * AION Service Broker: [AION Service Broker](https://github.com/latonaio/aion-core/tree/main/cmd/service-broker) は、主にエッジコンテナオーケストレーション環境において、AI / IoT マイクロサービスの実行に関する統括制御を行います。  
 * RabbitMQ x Kubernetes x AION Service Broker: これらの洗練された技術が疎結合することにより、AI / IoT 環境のために、統合された安定的なデータパイプラインのアーキテクチャが提供されます。  
+
+## AIONプラットフォームにおけるエッジとクラウドとのデータ統合  
+AIONプラットフォーム では、Data Stack / Data Hub として、エッジコンピューティング環境と Azure IoT Hub / Google Cloud IoT Core とのデータ統合が為されます。  
+
+AIONプラットフォームのエッジコンピューティング環境では、主に次の機能が提供されます。  
+
+* Edge Container Orchestrations, Kubernetes on the Edge (Master Node)（エッジコンテナオーケストレーションの機能、エッジにおける Kubernetes Master Node の機能）  
+* Sensed Data Orchestration（センサーデータのオーケストレーション機能）  
+* Microservice Oriented Architecture（マイクロサービス志向アーキテクチャの概念と機能）  
+* Microservice Brokerage（マイクロサービスのブローカー機能）  
+* Messeging Architecture on the Edge (RabbitMQ on Kubernetes)（エッジにおけるメッセージングアーキテクチャ - Kubernetes で動くRabbitMQ - の機能）
+* Flexible Logger Services including Fluentd, Avis, logging-libralies（フレキシブルなログサービス - Fluentd, Avis, ログライブラリを含む - 機能）
+
+エッジコンピューティング環境と統合されたクラウド環境(Azure IoT Hub / Google Cloud IoT Core)では、主に次の機能が提供されます。  
+
+* Data Stack / Data Hub の機能
+* Device Management の機能（エッジコンピューティング環境のデバイスと通信接続し、それらのデバイスからデータを取得し可視化する等の機能）  
+* Provisioning の機能（Data Stack / Data Hub や Device Management の環境のプロビジョニング機能）  
+* Bidirectional Communication（エッジコンピューティング環境との双方向通信の機能）  
+
+![edge_cloud](documents/edge_cloud.drawio_1120.png)
 
 ## シングルモードとクラスタモード
 
