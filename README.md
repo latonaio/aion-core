@@ -305,7 +305,8 @@ AIONプラットフォームのエッジコンピューティング環境では�
 * Microservice Oriented Architecture（マイクロサービス志向アーキテクチャの概念と機能）  
 * Microservice Brokerage（マイクロサービスのブローカー機能）  
 * Messeging Architecture on the Edge (RabbitMQ on Kubernetes)（エッジにおけるメッセージングアーキテクチャ - Kubernetes で動くRabbitMQ - の機能）
-* Flexible Logger Services including Fluentd, Avis, logging-libralies（フレキシブルなログサービス - Fluentd, Avis, ログライブラリを含む - 機能）
+* Flexible Logger Services including Fluentd, Avis, logging-libralies（フレキシブルなログサービス - Fluentd, Avis, ログライブラリを含む - 機能）  
+* Edge Container Deployment（エッジ環境におけるコンテナデプロイの機能）
 
 エッジコンピューティング環境と統合されたクラウド環境(Azure IoT Hub / Google Cloud IoT Core)では、主に次の機能が提供されます。  
 
