@@ -293,7 +293,7 @@ AIONプラットフォーム では、次の概念図の通り、AI/IoTランタ
 * RabbitMQ x Kubernetes x AION Service Broker: これらの洗練された技術が疎結合することにより、AI / IoT 環境のために、統合された安定的なデータパイプラインのアーキテクチャが提供されます。  
 
 ## AIONプラットフォームにおけるエッジとクラウドとのデータ統合  
-AIONプラットフォーム では、Data Stack / Data Hub として、エッジコンピューティング環境と Azure IoT Hub / Google Cloud IoT Core とのデータ統合が為されます。  
+AIONプラットフォーム では、次の概念図に説明される通り、エッジコンピューティング環境と Azure IoT Hub / Google Cloud IoT Core とのデータ統合が為されます。  
 
 ![edge_cloud](documents/edge_cloud.drawio_1120.png)
 
