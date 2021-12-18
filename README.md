@@ -271,7 +271,7 @@ AIONプラットフォーム のレポジトリは、次の分類に分かれま
 * Load Balancer(for Movable Devices) on Kubernetes
 * Container Deployment System と、それに含まれる個々のマイクロサービス  
 * Omotebako System と、それに含まれる個々のマイクロサービス  
-* SAP 関連 レポジトリ(Api-Integrations や SQL)  
+* SAP 関連 レポジトリ(API-Integrations、SQL、RedEdge、SAP-Sandbox)  
 * その他の個別マイクロサービス
 
 
