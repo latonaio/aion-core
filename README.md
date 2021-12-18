@@ -95,7 +95,7 @@ AIONは、100% Linux のオープンソース環境をベースとして開発�
 
 ## AIONのアーキテクチャ１
 AION の アーキテクチャ概要図 です。  
-![AIONアーキテクチャ概要](documents/aion_architecture_1115.png)
+![AIONアーキテクチャ概要](documents/aioncore_architecture1.png)
 
 ## AIONのアーキテクチャ２
 aion-core の メッセージングアーキテクチャ（カンバンシステム） の 図 です。（最新版のAIONでは、status-kanbanとkanban-replicator による メッセージングアーキテクチャは、RabbitMQ に置き換わっています）    
